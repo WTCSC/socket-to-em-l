@@ -1,6 +1,5 @@
 import socket
 
-
 def host_game(num_players):
     return Server(socket.socket(socket.AF_INET, socket.SOCK_STREAM), num_players)
 

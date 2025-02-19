@@ -3,6 +3,7 @@ import graphics
 import manager
 
 def prompt(text = "", options = [], error = ""):
+    print()
     print(text)
     user_input = input()
     if options and (user_input not in options):
@@ -21,3 +22,6 @@ else:
     print("What IP address do you want to connect to?")
     ip = input()
     player = connector.connect(ip)
+
+while True:
+    input("Take a turn:")
