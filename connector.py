@@ -1,5 +1,6 @@
 import socket
 import threading
+from sys import stdin
 
 # Start a server instance
 def host_game(num_players):
@@ -45,8 +46,8 @@ class Client:
 
     def close(self):
         self.socket.shutdown(socket.SHUT_RDWR)
-        self.socket.close()
         self.is_processing = False
+        print("Disconnected from server")
 
 class Server:
     def __init__(self, sock: socket.socket, player_count):
@@ -88,9 +89,7 @@ class Server:
         except Exception as e:
             print(f"Error: {e}")
         finally:
-            print("Disconnecting...")
-            sock.close()
-            self.clients.remove(sock)
+            self.disconnect(sock)
 
     # Send data to each client
     def brodcast(self, data):
@@ -105,8 +104,11 @@ class Server:
     def close(self):
         for client in self.clients:
             client.shutdown(socket.SHUT_RDWR)
-            client.close()
         self.socket.close()
-        for thread in self.threads:
-            thread.join()
         self.is_processing = False
+    
+    def disconnect(self, client: socket.socket):
+        client.close()
+        self.clients.remove(client)
+        if len(self.clients) == 0:
+            self.close()

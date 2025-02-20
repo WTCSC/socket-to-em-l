@@ -26,9 +26,13 @@ else:
 print("\nWelcome to the game!\n")
 
 try:
-    while player.is_processing:
+    while True:
         turn = input()
-        player.send(turn)
+        if player.is_processing:
+            player.send(turn)
+        else:
+            print("You are disconnected from the server. Exiting...")
+            break
 except KeyboardInterrupt:
     print("Ending game...")
 except Exception as e:
