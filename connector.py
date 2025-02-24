@@ -1,6 +1,5 @@
 import socket
 import threading
-from sys import stdin
 
 # Start a server instance
 def host_game(num_players):
@@ -63,8 +62,10 @@ class Server:
             conn, _ = self.socket.accept()
             self.clients.append(conn)
 
+            self.clients[-1].send(f"You are player {i + 1}\n".encode())
+
             print(f"\nPlayer {i + 1} connected")
-            print(f"Players connected {i + 1}/{player_count}")
+            self.brodcast(f"Players connected {i + 1}/{player_count}")
 
         print("All players connected")
         
@@ -75,9 +76,6 @@ class Server:
             self.threads[-1].start()
         
         self.is_processing = True
-    
-    def send(self, data):
-        self.parse_data(data)
 
     def recieve(self, sock: socket.socket):
         try:
@@ -85,7 +83,7 @@ class Server:
                 data = sock.recv(1024).decode()
                 if not data:
                     break
-                self.parse_data(data)
+                self.brodcast(data)
         except Exception as e:
             print(f"Error: {e}")
         finally:
@@ -93,12 +91,12 @@ class Server:
 
     # Send data to each client
     def brodcast(self, data):
+        self.parse_data(data)
         for client in self.clients:
             client.send(data.encode())
 
     def parse_data(self, data):
         print(data)
-        self.brodcast(data)
     
     # Close all the clients, then close the server
     def close(self):

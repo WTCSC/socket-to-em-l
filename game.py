@@ -23,8 +23,6 @@ else:
     ip = input()
     player = connector.connect(ip)
 
-print("\nWelcome to the game!\n")
-
 try:
     while True:
         turn = input()
