@@ -69,8 +69,14 @@ GLOBAL_SCALE = (.25, .25)
 background = GameObject('imgs/background_grid.png', (0, 0))
 background.size((3000, 2000))
 
-starship = Troop('imgs/black_ship.png', (600, 450), 400, 20)
-starship.scale(GLOBAL_SCALE)
+starship_grey = Troop('imgs/black_ship.png', (600, 450), 400, 2)
+starship_grey.scale(GLOBAL_SCALE)
+
+#starship_red = Troop('imgs/red_ship.png', (600, 450), 400, 2)
+#starship_red.scale(GLOBAL_SCALE)
+
+#starship_yellow = Troop('imgs/yellow_ship.png', (600, 450), 400, 2)
+#starship_yellow.scale(GLOBAL_SCALE)
 
 command_center = Building('imgs/command_center.png', (100, 100), 3000)
 command_center.scale(GLOBAL_SCALE)
@@ -84,7 +90,7 @@ starport.scale(GLOBAL_SCALE)
 depot = Building('imgs/vehicle_deop.png', (375, 350), 1500)
 depot.scale(GLOBAL_SCALE)
 
-red_troop = Troop('imgs/red_soildger.png', (1200, 700), 75, 5)
+red_troop = Troop('imgs/red_soildger.png', (1200, 700), 75, 2)
 red_troop.scale(GLOBAL_SCALE)
 
 blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 75, 5)
@@ -111,11 +117,11 @@ while True:
     red_troop.velocity = Vector2(-1, -1) * red_troop.speed
 
     blue_troop.move()
-    starship.move()
+    starship_grey.move()
     red_troop.move()
 
     background.render()
-    starship.render()
+    starship_grey.render()
     command_center.render()
     barracks.render()
     starport.render()
