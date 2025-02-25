@@ -65,6 +65,9 @@ class Troop(GameObject):
         self.position.y += self.velocity.y
         self.rect.topleft = (self.position.x, self.position.y)
 
+    def goto(self, position: Vector2):
+        self.velocity = Vector2(position.x - self.position.x, position.y - self.position.y).normalize() * self.speed
+
 def main():
     # Initialize pygame
     pygame.init()
@@ -137,10 +140,10 @@ def main():
         # Troop movement logic
         for i, troop in enumerate(troops):
             next_troop = troops[i + 1] if i + 1 < len(troops) else troops[0]
-            troop.velocity = Vector2(next_troop.position.x - troop.position.x, next_troop.position.y - troop.position.y).normalize() * troop.speed
+            troop.goto(next_troop.position)
             troop.move()
 
-        blue_troop.velocity = Vector2(red_troop.position.x - blue_troop.position.x, red_troop.position.y - blue_troop.position.y).normalize() * blue_troop.speed
+        blue_troop.goto(red_troop.position)
         red_troop.velocity = Vector2(-1, -1) * red_troop.speed
 
         blue_troop.move()
