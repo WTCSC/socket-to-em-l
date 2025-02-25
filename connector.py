@@ -1,5 +1,5 @@
 import socket
-import threading
+from threading import Thread
 
 # Start a server instance
 def host_game(num_players):
@@ -17,7 +17,7 @@ class Client:
         print("Connected to server")
 
         # Start a thread to listen to the server
-        self.receive_thread = threading.Thread(None, self.receive)
+        self.receive_thread = Thread(target=self.receive)
         self.receive_thread.start()
 
         self.is_processing = True
@@ -54,6 +54,8 @@ class Server:
         self.socket = sock
         self.socket.bind(("0.0.0.0", 1212))
         self.socket.listen(player_count)
+        hostname = socket.gethostname()
+        print(f"Your IP address is {socket.gethostbyname(hostname)}\n")
         print(f"Players connected 1/{player_count}")
 
         # Wait for connection from each player
@@ -70,9 +72,9 @@ class Server:
         print("All players connected")
         
         # Start a thread for each player to listen to them
-        self.threads: list[threading.Thread] = []
+        self.threads: list[Thread] = []
         for client in self.clients:
-            self.threads.append(threading.Thread(None, self.recieve, None, [client]))
+            self.threads.append(Thread(target=self.recieve, args=[client]))
             self.threads[-1].start()
         
         self.is_processing = True

@@ -1,7 +1,12 @@
 import connector
-# import graphics
+import draw
 import manager
+from threading import Thread
 
+def process_game():
+    draw.main()
+
+# Prompts the user and validates their input based on options
 def prompt(text = "", options = [], error = ""):
     print()
     print(text)
@@ -13,8 +18,10 @@ def prompt(text = "", options = [], error = ""):
 
 
 print("Welcome to ____\n")
+
 is_hosting = prompt("Are you hosting or joining a game?\n1. Hosting\n2. Joining", ["1", "2"]) == "1"
 
+# Make the player either a host or a client
 if is_hosting:
     player_count = 2 #int(prompt("How many people are playing? Choose a number between 2 and 4", ["2", "3", "4"], "\nPlease chose a player count between 2 and 4\n"))
     player = connector.host_game(player_count)
@@ -23,8 +30,12 @@ else:
     ip = input()
     player = connector.connect(ip)
 
+game_loop = Thread(target=process_game)
+game_loop.start()
+
 try:
     while True:
+        # Get the player input and send it to the server
         turn = input()
         if player.is_processing:
             player.send(turn)
