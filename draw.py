@@ -133,6 +133,12 @@ def main():
         if keys[pygame.K_ESCAPE]:
             pygame.quit()
             exit()
+        mouse_pos = pygame.mouse.get_pos()
+        if command_center.rect.collidepoint((mouse_pos)):
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 3:
+                    
+                
 
         # Troop movement logic
         for i, troop in enumerate(troops):
