@@ -68,7 +68,8 @@ class Troop(GameObject):
 def main():
     # Initialize pygame
     pygame.init()
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen = pygame.display.set_mode((1920, 1080))
     GLOBAL_SCALE = (.25, .25)
 
     # Camera setup
@@ -161,6 +162,9 @@ def main():
         
         for troop in troops:
             troop.render(camera, screen)
+        
+        resized_screen = pygame.transform.scale(screen, (window.get_width(), window.get_height()))
+        window.blit(resized_screen, (0, 0))
 
         # Update the display
         pygame.display.update()
