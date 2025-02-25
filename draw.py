@@ -37,7 +37,6 @@ class GameObject:
         self.rect = self.surf.get_rect(topleft=tuple(self.position))
     
     def render(self, camera, screen):
-        """Render object relative to camera position"""
         screen.blit(self.surf, (self.rect.x - camera.x, self.rect.y - camera.y))
     
     def scale(self, factor: tuple):
@@ -59,14 +58,38 @@ class Troop(GameObject):
         self.health = health
         self.speed = speed
         self.velocity = Vector2(0, 0)
+        self.target: Vector2 | None = None
+    
+    def stop(self):
+        self.velocity = Vector2 (0, 0)
 
     def move(self):
+        if self.target:
+            self.goto(self.target)
+            if self.position.x == self.target.x and self.position.y == self.target.y:
+                print("no target")
+                self.target = None
+        # else: self.stop()
         self.position.x += self.velocity.x
         self.position.y += self.velocity.y
         self.rect.topleft = (self.position.x, self.position.y)
 
     def goto(self, position: Vector2):
         self.velocity = Vector2(position.x - self.position.x, position.y - self.position.y).normalize() * self.speed
+
+def get_camera_position(camera: Vector2, world_size: tuple, screen_size: tuple) -> tuple:
+    camera_x = max(0, min(camera.x, world_size[0] - screen_size[0]))
+    camera_y = max(0, min(camera.y, world_size[1] - screen_size[1]))
+    return Vector2(camera_x, camera_y)
+
+def select_troop(mouse_pos: tuple, camera: Vector2, troops: list, selected_troop: Troop = None) -> Troop:
+    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
+    
+    for troop in troops:
+        if troop.rect.collidepoint(cam_offset.x, cam_offset.y):
+            return troop  # Return the new selected troop
+    
+    return selected_troop
 
 def main():
     # Initialize pygame
@@ -111,10 +134,8 @@ def main():
     blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 75, 5)
     blue_troop.scale(GLOBAL_SCALE)
 
-    troops: list[Troop] = []
-    for i in range(3):
-        troops.append(Troop('imgs/blue_soildger.png', (400 * i, 300 * i), 75, 5))
-        troops[-1].scale(GLOBAL_SCALE)
+    selected_troop = None
+    troops = [red_troop, blue_troop, starship_grey]
 
     # Game loop
     while True:
@@ -123,38 +144,38 @@ def main():
                 pygame.quit()
                 exit()
 
-        # Camera movement
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_w]:  # Move up
-            camera.y = max(camera.y - camera_speed, 0)
-        if keys[pygame.K_s]:  # Move down
-            camera.y = min(camera.y + camera_speed, (background.rect.height * 2) - screen.get_height())
-        if keys[pygame.K_a]:  # Move left
-            camera.x = max(camera.x - camera_speed, 0)
-        if keys[pygame.K_d]:  # Move right
-            camera.x = min(camera.x + camera_speed, (background.rect.width * 2) - screen.get_width())
-        if keys[pygame.K_ESCAPE]:
-            pygame.quit()
-            exit()
-        mouse_pos = pygame.mouse.get_pos()
-        if command_center.rect.collidepoint((mouse_pos)):
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 3:
-                    
-                
+            mouse_pos = pygame.mouse.get_pos()
+            world_size = (background.rect.width * 2, background.rect.height * 2)
+            screen_size = screen.get_size()
 
-        # Troop movement logic
-        for i, troop in enumerate(troops):
-            next_troop = troops[i + 1] if i + 1 < len(troops) else troops[0]
-            troop.goto(next_troop.position)
-            troop.move()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                selected_troop = select_troop(pygame.mouse.get_pos(), camera, troops, selected_troop)
+                print(selected_troop)
 
-        blue_troop.goto(red_troop.position)
-        red_troop.velocity = Vector2(-1, -1) * red_troop.speed
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                selected_troop = select_troop(pygame.mouse.get_pos(), camera, troops, selected_troop)
+                if selected_troop != None:
+                    cam_pos = get_camera_position(camera, world_size, screen_size)
+                    red_troop.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
+                    print(red_troop.target)
+                    red_troop.move()
 
-        blue_troop.move()
-        red_troop.move()
-        starship_grey.move()
+            # Camera movement
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_w]:  # Move up
+                camera.y = max(camera.y - camera_speed, 0)
+            if keys[pygame.K_s]:  # Move down
+                camera.y = min(camera.y + camera_speed, (background.rect.height * 2) - screen.get_height())
+            if keys[pygame.K_a]:  # Move left
+                camera.x = max(camera.x - camera_speed, 0)
+            if keys[pygame.K_d]:  # Move right
+                camera.x = min(camera.x + camera_speed, (background.rect.width * 2) - screen.get_width())
+            if keys[pygame.K_x]:
+                Troop.stop(self=red_troop)
+            if keys[pygame.K_ESCAPE]:
+                pygame.quit()
+                exit()
+
 
         # Render background tiles
         for pos in background_tiles:
@@ -168,9 +189,6 @@ def main():
         depot.render(camera, screen)
         red_troop.render(camera, screen)
         blue_troop.render(camera, screen)
-        
-        for troop in troops:
-            troop.render(camera, screen)
         
         resized_screen = pygame.transform.scale(screen, (window.get_width(), window.get_height()))
         window.blit(resized_screen, (0, 0))
