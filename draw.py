@@ -28,21 +28,18 @@ class GameObject:
         self.sprite = sprite
         self.position = Vector2(position[0], position[1])
         self.surf = pygame.image.load(self.sprite)
-        self.rect = self.get_rect()
+        self.rect = self.surf.get_rect(topleft = tuple(self.position))
     
     def render(self):
         screen.blit(self.surf, self.rect)
     
     def scale(self, factor: tuple):
         self.surf = pygame.transform.scale(self.surf, (self.rect.width * factor[0], self.rect.height * factor[1]))
-        self.rect = self.get_rect()
+        self.rect.size = (self.surf.get_width(), self.surf.get_height())
     
     def size(self, size: tuple):
         self.surf = pygame.transform.scale(self.surf, size)
-        self.rect = self.get_rect()
-
-    def get_rect(self):
-        return self.surf.get_rect(topleft = tuple(self.position))
+        self.rect.size = (self.surf.get_width(), self.surf.get_height())
 
 class Building(GameObject):
     def __init__(self, sprite: str, position: tuple, health: int):
@@ -59,7 +56,7 @@ class Troop(GameObject):
     def move(self):
         self.position.x += self.velocity.x
         self.position.y += self.velocity.y
-        self.rect = self.get_rect()
+        self.rect.topleft = (self.position.x, self.position.y)
 
 
 pygame.init()
@@ -92,7 +89,8 @@ blue_troop.scale(GLOBAL_SCALE)
 
 troops: list[Troop]= []
 for i in range(3):
-    troops.append(Troop('imgs/blue_soildger.png', (200 * i, 200 * i), 75, 5))
+    troops.append(Troop('imgs/blue_soildger.png', (400 * i, 300 * i), 75, 5))
+    troops[-1].scale(GLOBAL_SCALE)
 
 while True:
     for event in pygame.event.get():
@@ -100,12 +98,13 @@ while True:
             pygame.quit()
             exit()
     
+    background.render()
     for i, troop in enumerate(troops):
         next_troop = troops[i + 1] if i + 1 < len(troops) else troops[0]
         troop.velocity = Vector2(next_troop.position.x - troop.position.x, next_troop.position.y - troop.position.y).normalize() * troop.speed
         troop.move()
-        print(troop.surf.get_height())
         troop.render()
+
 
     blue_troop.velocity = Vector2(red_troop.position.x - blue_troop.position.x, red_troop.position.y - blue_troop.position.y).normalize() * blue_troop.speed
     red_troop.velocity = Vector2(-1, -1) * red_troop.speed
@@ -114,7 +113,6 @@ while True:
     starship.move()
     red_troop.move()
 
-    background.render()
     starship.render()
     command_center.render()
     barracks.render()
