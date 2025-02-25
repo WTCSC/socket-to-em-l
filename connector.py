@@ -1,5 +1,5 @@
 import socket
-from threading import Thread
+from threading import Thread, Event
 
 # Start a server instance
 def host_game(num_players):
@@ -16,11 +16,13 @@ class Client:
         self.socket.connect((ip, 1212))
         print("Connected to server")
 
+        self.event = Event()
         # Start a thread to listen to the server
         self.receive_thread = Thread(target=self.receive)
         self.receive_thread.start()
 
         self.is_processing = True
+
     
     # Send data to the server
     def send(self, data: str):
@@ -33,9 +35,9 @@ class Client:
                 data = self.socket.recv(1024).decode()
                 if not data:
                     break
+                if self.event.is_set():
+                    break
                 self.parse_data(data)
-        except Exception as e:
-            print(f"Error: {e}")
         finally:
             print("Disconnecting...")
             self.close()
@@ -44,9 +46,11 @@ class Client:
         print(data)
 
     def close(self):
-        self.socket.shutdown(socket.SHUT_RDWR)
-        self.is_processing = False
-        print("Disconnected from server")
+        if self.socket.fileno() != -1:
+            self.socket.shutdown(socket.SHUT_RDWR)
+            self.is_processing = False
+            print("Disconnected from server")
+        self.event.set()
 
 class Server:
     def __init__(self, sock: socket.socket, player_count):
@@ -73,17 +77,23 @@ class Server:
         
         # Start a thread for each player to listen to them
         self.threads: list[Thread] = []
+        self.events: list[Event] = []
         for client in self.clients:
-            self.threads.append(Thread(target=self.recieve, args=[client]))
+            event = Event()
+            self.events.append(event)
+            self.threads.append(Thread(target=self.recieve, args=[client, event]))
             self.threads[-1].start()
         
         self.is_processing = True
 
-    def recieve(self, sock: socket.socket):
+    def recieve(self, sock: socket.socket, event: Event):
+        receiving = True
         try:
-            while True:
+            while receiving:
                 data = sock.recv(1024).decode()
                 if not data:
+                    break
+                if event.is_set():
                     break
                 self.brodcast(data)
         except Exception as e:
@@ -102,13 +112,22 @@ class Server:
     
     # Close all the clients, then close the server
     def close(self):
-        for client in self.clients:
-            client.shutdown(socket.SHUT_RDWR)
+        for client in [i for i in self.clients if i]:
+            if client.fileno() != -1:
+                client_number = self.clients.index(client)
+                self.events[client_number].set()
+                client.shutdown(socket.SHUT_RDWR)
         self.socket.close()
         self.is_processing = False
+
     
     def disconnect(self, client: socket.socket):
-        client.close()
-        self.clients.remove(client)
-        if len(self.clients) == 0:
-            self.close()
+        if client:
+            client_number = self.clients.index(client)
+            print(f"Player {client_number + 1} has left the game")
+            client.close()
+            self.clients[client_number] = False
+            self.events[client_number].set()
+            if len([i for i in self.clients if i]) == 0:
+                print("No players connected. Closing server")
+                self.close()
