@@ -1,133 +1,119 @@
 import socket
-from threading import Thread, Event
+import manager
+from threading import Thread
 
 # Start a server instance
 def host_game(num_players):
-    return Server(socket.socket(socket.AF_INET, socket.SOCK_STREAM), num_players)
+    return Server(num_players)
 
 # Start a client and connect it to the server
 def connect(ip):
-    return Client(socket.socket(socket.AF_INET, socket.SOCK_STREAM), ip)
+    return Client(ip)
 
 class Client:
-    def __init__(self, sock: socket.socket, ip):
-        # Connect to the server
-        self.socket = sock
+    def __init__(self, ip):
+        # Initialize the connection
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((ip, 1212))
         print("Connected to server")
 
-        self.event = Event()
-        # Start a thread to listen to the server
-        self.receive_thread = Thread(target=self.receive)
-        self.receive_thread.start()
-
-        self.is_processing = True
-
+        self.recieving_thread = Thread(target=self.recieve)
+        self.recieving_thread.start()
     
-    # Send data to the server
-    def send(self, data: str):
-        self.socket.send(data.encode())
-    
-    # Waits for data from the server
-    def receive(self):
+    def recieve(self):
         try:
             while True:
                 data = self.socket.recv(1024).decode()
-                if not data:
+                if data == "close" or not data:
                     break
-                if self.event.is_set():
-                    break
-                self.parse_data(data)
+                manager.parse_data(data)
         finally:
-            print("Disconnecting...")
             self.close()
     
-    def parse_data(self, data: str):
-        print(data)
-
+    def send(self, data: str):
+        if self.socket.fileno() != -1:
+            self.socket.send(data.encode())
+    
     def close(self):
         if self.socket.fileno() != -1:
-            self.socket.shutdown(socket.SHUT_RDWR)
-            self.is_processing = False
-            print("Disconnected from server")
-        self.event.set()
+            self.socket.close()
+            # manager.end_game()
 
 class Server:
-    def __init__(self, sock: socket.socket, player_count):
-        # Open a connection and listen for a number of players
-        self.socket = sock
+    def __init__(self, num_players):
+        # Initialize the server's socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(("0.0.0.0", 1212))
-        self.socket.listen(player_count)
+        self.socket.listen(num_players - 1)
+
+        # Show some information before connecting the clients
         hostname = socket.gethostname()
-        print(f"Your IP address is {socket.gethostbyname(hostname)}\n")
-        print(f"Players connected 1/{player_count}")
+        print(f"Your IP address is {socket.gethostbyname_ex(hostname)[-1][-1]}\n")
+        print(f"Players connected 1/{num_players}")
 
-        # Wait for connection from each player
-        self.clients : list[socket.socket] = []
-        for i in range(1, player_count):
+        # Connect each player and start a thread to listen to each of them
+        self.clients : list[tuple[socket.socket, int]] = []
+        self.threads: list[Thread] = []
+
+        for i in range(1, num_players):
+            # Accept the player connection
             conn, _ = self.socket.accept()
-            self.clients.append(conn)
+            self.clients.append((conn, i))
 
-            self.clients[-1].send(f"You are player {i + 1}\n".encode())
+            # Start a thread to listen to the player
+            receiving_thread = Thread(target=self.recieve, args=[conn])
+            receiving_thread.start()
+            self.threads.append(receiving_thread)
+
+            # Tell the player which player they are
+            conn.send(f"You are player {i + 1}\n".encode())
 
             print(f"\nPlayer {i + 1} connected")
-            self.brodcast(f"Players connected {i + 1}/{player_count}")
+            print(f"Players connected {i + 1}/{num_players}")
+            self.broadcast(f"Players connected {i + 1}/{num_players}")
 
-        print("All players connected")
-        
-        # Start a thread for each player to listen to them
-        self.threads: list[Thread] = []
-        self.events: list[Event] = []
-        for client in self.clients:
-            event = Event()
-            self.events.append(event)
-            self.threads.append(Thread(target=self.recieve, args=[client, event]))
-            self.threads[-1].start()
-        
-        self.is_processing = True
-
-    def recieve(self, sock: socket.socket, event: Event):
-        receiving = True
+    # Listen to a client for data
+    def recieve(self, client: socket.socket):
         try:
-            while receiving:
-                data = sock.recv(1024).decode()
+            while True:
+                # Get the data and decode it
+                data = client.recv(1024).decode()
+                # If there is no data, the connection was closed
                 if not data:
                     break
-                if event.is_set():
-                    break
-                self.brodcast(data)
-        except Exception as e:
-            print(f"Error: {e}")
+                # Parse the data and send it to all clients
+                self.send(data)
         finally:
-            self.disconnect(sock)
-
-    # Send data to each client
-    def brodcast(self, data):
-        self.parse_data(data)
+            self.socket.close()
+    
+    # "Send" data to the server and broadcast the data to all clients
+    def send(self, data: str):
+        manager.parse_data(data)
+        self.broadcast(data)
+    
+    # Send data to all clients
+    def broadcast(self, data: str):
         for client in self.clients:
-            client.send(data.encode())
+            client[0].send(data.encode())
 
-    def parse_data(self, data):
-        print(data)
+    # Send data to all clients and the server
+    def broadcast_all(self, data: str):
+        manager.parse_data(data)
+        self.broadcast(data)
     
-    # Close all the clients, then close the server
+    # Close a single client
+    def close_client(self, client: socket.socket):
+        # Check if the connection is open
+        if client.fileno() != -1:
+            # Get which client to close
+            client_index = [i[0] for i in self.clients].index(client)
+
+            # Close the client and remove it from the list
+            self.clients.pop(client_index)[0].close()
+            print(f"Player {client_index + 1} has left the game")
+            if len(self.clients) == 0:
+                self.close_all()
+
     def close(self):
-        for client in [i for i in self.clients if i]:
-            if client.fileno() != -1:
-                client_number = self.clients.index(client)
-                self.events[client_number].set()
-                client.shutdown(socket.SHUT_RDWR)
+        self.broadcast("close")
         self.socket.close()
-        self.is_processing = False
-
-    
-    def disconnect(self, client: socket.socket):
-        if client:
-            client_number = self.clients.index(client)
-            print(f"Player {client_number + 1} has left the game")
-            client.close()
-            self.clients[client_number] = False
-            self.events[client_number].set()
-            if len([i for i in self.clients if i]) == 0:
-                print("No players connected. Closing server")
-                self.close()

@@ -48,14 +48,16 @@ class GameObject:
         self.rect.size = (self.surf.get_width(), self.surf.get_height())
 
 class Building(GameObject):
-    def __init__(self, sprite: str, position: tuple, health: int):
+    def __init__(self, sprite: str, position: tuple, max_health: int):
         super().__init__(sprite, position)
-        self.health = health
+        self.max_health = max_health
+        self.health = max_health
 
 class Troop(GameObject):
-    def __init__(self, sprite: str, position: tuple, health: int, speed: int):
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int):
         super().__init__(sprite, position)
-        self.health = health
+        self.max_health = max_health
+        self.health = max_health
         self.speed = speed
         self.velocity = Vector2(0, 0)
         self.target: Vector2 | None = None
@@ -66,9 +68,10 @@ class Troop(GameObject):
     def move(self):
         if self.target:
             self.goto(self.target)
-            if self.position.x == self.target.x and self.position.y == self.target.y:
+            if self.speed >= (self.position - self.target).length >= -1 * self.speed:#self.position.x == self.target.x and self.position.y == self.target.y:
                 print("no target")
                 self.target = None
+                self.stop()
         # else: self.stop()
         self.position.x += self.velocity.x
         self.position.y += self.velocity.y
@@ -77,12 +80,16 @@ class Troop(GameObject):
     def goto(self, position: Vector2):
         self.velocity = Vector2(position.x - self.position.x, position.y - self.position.y).normalize() * self.speed
 
+class Game:
+    def __init__(self):
+        self.game_objects: dict[str, list[GameObject]] = {}
+
 def get_camera_position(camera: Vector2, world_size: tuple, screen_size: tuple) -> tuple:
     camera_x = max(0, min(camera.x, world_size[0] - screen_size[0]))
     camera_y = max(0, min(camera.y, world_size[1] - screen_size[1]))
     return Vector2(camera_x, camera_y)
 
-def select_troop(mouse_pos: tuple, camera: Vector2, troops: list, selected_troop: Troop = None) -> Troop:
+def select_troop(mouse_pos: tuple, camera: Vector2, troops: list[Troop], selected_troop: Troop = None) -> Troop:
     cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
     
     for troop in troops:
@@ -128,7 +135,7 @@ def main():
     depot = Building('imgs/vehicle_deop.png', (375, 350), 1500)
     depot.scale(GLOBAL_SCALE)
 
-    red_troop = Troop('imgs/red_soildger.png', (1200, 700), 75, 2)
+    red_troop = Troop('imgs/red_soildger.png', (1200, 700), 75, 20)
     red_troop.scale(GLOBAL_SCALE)
 
     blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 75, 5)
@@ -158,7 +165,6 @@ def main():
                     cam_pos = get_camera_position(camera, world_size, screen_size)
                     red_troop.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
                     print(red_troop.target)
-                    red_troop.move()
 
             # Camera movement
             keys = pygame.key.get_pressed()
@@ -181,6 +187,7 @@ def main():
         for pos in background_tiles:
             screen.blit(background.surf, (pos[0] - camera.x, pos[1] - camera.y))
 
+        red_troop.move()
         # Render objects
         starship_grey.render(camera, screen)
         command_center.render(camera, screen)

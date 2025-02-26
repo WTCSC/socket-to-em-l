@@ -1,17 +1,13 @@
 import connector
-import draw
 import manager
 from threading import Thread
+from time import sleep
 
 def get_input():
     while True:
         # Get the player input and send it to the server
         turn = input()
-        if player.is_processing:
-            player.send(turn)
-        else:
-            print("You are disconnected from the server. Exiting...")
-            break
+        player.send(turn)
 
 # Prompts the user and validates their input based on options
 def prompt(text = "", options = [], error = ""):
@@ -40,13 +36,13 @@ else:
 try:
     game_loop = Thread(target=get_input, daemon=True)
     game_loop.start()
-
-    draw.main()
+    while True:
+        sleep(1)
+    # draw.main()
 except KeyboardInterrupt:
     print("Ending game...")
 except Exception as e:
     print(f"Error: {e}")
 finally:
-    draw.pygame.quit()
     player.close()
     print("Disconnected")
