@@ -156,8 +156,8 @@ def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Tro
 def main():
     # Initialize pygame
     pygame.init()
-    window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-    screen = pygame.display.set_mode((1920, 1080))
+
+    screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN | pygame.SCALED)
     GLOBAL_SCALE = (.25, .25)
 
     # Camera setup
@@ -285,9 +285,6 @@ def main():
 
         if selected_enemy_troop:
             screen.blit(red_indicator.surf, (selected_enemy_troop.rect.midbottom[0] - camera.x - red_indicator.rect.width // 2, selected_enemy_troop.rect.midbottom[1] - camera.y))
-        
-        resized_screen = pygame.transform.scale(screen, (window.get_width(), window.get_height()))
-        window.blit(resized_screen, (0, 0))
 
         # Update the display
         pygame.display.update()
