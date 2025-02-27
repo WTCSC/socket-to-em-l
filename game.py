@@ -1,5 +1,5 @@
 import connector
-import manager
+# import manager
 from threading import Thread
 from time import sleep
 
