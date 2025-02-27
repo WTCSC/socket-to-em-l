@@ -1,4 +1,5 @@
 import pygame
+import time
 import random
 from math import sqrt
 from sys import exit
@@ -58,8 +59,14 @@ class Building(GameObject):
         self.max_health = max_health
         self.health = max_health
 
+"""class Projectile(GameObject):
+    def __init__(self, sprite: str, position: tuple, speed: int, damage: int):
+        super().__init__(sprite, position)
+        self.speed = speed
+        self.damage = damage"""
+
 class Troop(GameObject):
-    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int):
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, sight_range: int = 250, shot_cooldown: int = 1):
         super().__init__(sprite, position)
         self.max_health = max_health
         self.health = max_health
@@ -67,36 +74,43 @@ class Troop(GameObject):
         self.damage = damage
         self.velocity = Vector2(0, 0)
         self.target: Vector2 | None = None
-        self.is_targeting_enemy = False
-        self.enemy_target = None
-        self.b1_image = GameObject('imgs/b1.png', (0, 0))  # Example image, adjust path as needed.
-        self.b1_image.scale((0.15, 0.15))  # Adjust size if necessary
-        self.b1_speed = 50  # Set the speed for the b1 image.
+        self.enemy_target: Troop | None = None
+        self.sight_range = sight_range
+        self.shot_cooldown = shot_cooldown
+        self.time_since_shot = 0
+        self.indicator = None
 
     def stop(self):
         self.velocity = Vector2(0, 0)
 
     def move(self, camera, screen):
-        if self.target:
-            if self.is_targeting_enemy:
-                distance_to_target = (self.position - self.enemy_target.position).length
-                if distance_to_target <= 250:
-                    # Show the b1 image when the troop is within range
-                    self.b1_image.position = self.enemy_target.position  # Set the position of b1 near the enemy
-                    self.b1_image.render(camera, screen)  # Render b1 image
-                    self.reduce_enemy_health()
-                    self.stop()
-                    self.is_targeting_enemy = False
-                    self.target = None
-                else:
-                    self.goto(self.enemy_target.position)
+        if self.enemy_target:
+            distance_to_target = (self.position - self.enemy_target.position).length
 
+            if distance_to_target <= self.sight_range:
+                if time.time() - self.time_since_shot > self.shot_cooldown:
+                    self.projectile()
+                    self.time_since_shot = time.time()
+                self.stop()
+                self.target = None
             else:
-                distance_to_target = (self.position - self.target).length
-                if distance_to_target <= self.speed:
-                    self.stop()
-                else:
-                    self.goto(self.target)
+                self.target = self.enemy_target.position
+
+            if self.rect.colliderect(self.enemy_target.rect):
+                bullets.remove(self)
+                if self.enemy_target.health > 0:
+                    self.enemy_target.health -= self.damage
+                if self.enemy_target.health <= 0:
+                    enemy_troops.remove(self.enemy_target)
+            elif self.enemy_target.health <= 0:
+                self.enemy_target = None
+
+        if self.target:
+            distance_to_target = (self.position - self.target).length
+            if distance_to_target <= self.speed:
+                self.stop()
+            else:
+                self.goto(self.target)
 
             self.position.x += self.velocity.x
             self.position.y += self.velocity.y
@@ -106,25 +120,14 @@ class Troop(GameObject):
         direction = Vector2(position.x - self.position.x, position.y - self.position.y)
         self.velocity = direction.normalize() * self.speed
 
-    def combat(self, other):
-        self.enemy_target = other
-        distance = sqrt((self.position.x - other.position.x) ** 2 + (self.position.y - other.position.y) ** 2)
-
-        if distance <= 250:
-            self.stop()
-            self.is_targeting_enemy = False
-            self.target = None
-        else:
-            self.is_targeting_enemy = True
-            self.target = other.position
-
-    def reduce_enemy_health(self):
-        # Reduce health by 40-50
+    def projectile(self):
+        speed = 50
         damage = random.randint(40, 50)
-        if self.enemy_target:
-            self.enemy_target.health -= damage
-            print(f"Enemy health reduced by {damage}. New health: {self.enemy_target.health}")
-
+        bullet = Troop("imgs/b1.png", (self.position.x, self.position.y), 1, speed, damage, 0)
+        bullet.scale((.5, .5))
+        bullets.append(bullet)
+        bullet.enemy_target = self.enemy_target
+        
 
 class Game:
     def __init__(self):
@@ -140,8 +143,10 @@ def select_troop(mouse_pos: tuple, camera: Vector2, troops: list[Troop], selecte
     
     for troop in troops:
         if troop.rect.collidepoint(cam_offset.x, cam_offset.y):
-            return troop
-    
+            selected_troop = troop
+            green =  Indicator('imgs/green.png')
+            green.scale((.15, .15))
+            greens.append(green)
     return selected_troop
 
 def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Troop], selected_enemy_troop: Troop = None) -> Troop:
@@ -149,7 +154,10 @@ def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Tro
     
     for enemy_troop in enemy_troops:
         if enemy_troop.rect.collidepoint(cam_offset.x, cam_offset.y):
-            return enemy_troop
+            selected_enemy_troop = enemy_troop
+            red =  Indicator('imgs/red.png')
+            red.scale((.15, .15))
+            reds.append(red)
     
     return selected_enemy_troop
 
@@ -175,12 +183,6 @@ def main():
     ]
 
     # Load game objects
-    green_indicator = Indicator('imgs/green.png')
-    green_indicator.scale((.15, .15))
-
-    red_indicator = Indicator('imgs/red.png')
-    red_indicator.scale((.2, .2))
-
     starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, int(200-250))
     starship_grey.scale(GLOBAL_SCALE)
 
@@ -205,13 +207,17 @@ def main():
     blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
     blue_troop.scale(GLOBAL_SCALE)
 
-    blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 500, 10, int(150-180))
-    blue_tank.scale((.2, .2))
-
     selected_troop = None
     selected_enemy_troop = None
     troops = [red_troop, starship_red]
-    enemy_troops = [blue_troop, starship_grey, blue_tank]
+    global bullets
+    bullets = []
+    global greens
+    greens = []
+    global reds
+    reds = []
+    global enemy_troops
+    enemy_troops = []
     buildings = [command_center, barracks, starport, depot]
 
     # Game loop
@@ -253,11 +259,19 @@ def main():
             if keys[pygame.K_c] and selected_troop in troops:
                 selected_enemy_troop = select_enemy_troop(pygame.mouse.get_pos(), camera, enemy_troops, selected_enemy_troop)
                 if selected_enemy_troop:
-                    selected_troop.combat(selected_enemy_troop)
+                    selected_troop.enemy_target = selected_enemy_troop
             if keys[pygame.K_ESCAPE]:
                 pygame.quit()
                 exit()
 
+            if event.type == pygame.KEYDOWN:
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_t]:
+                    blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 60, 10, int(150-180))
+                    blue_tank.scale((.2, .2))
+                    enemy_troops.append(blue_tank)
+
+            print(len(enemy_troops))
 
         # Render background tiles
         for pos in background_tiles:
@@ -267,7 +281,21 @@ def main():
         blue_troop.move(camera, screen)
         starship_grey.move(camera, screen)
         starship_red.move(camera, screen)
-        blue_tank.move(camera, screen)
+
+        for blue_tank in enemy_troops:
+            blue_tank.move(camera, screen)
+            blue_tank.render(camera, screen)
+
+        for bullet in bullets:
+            bullet.move(camera, screen)
+            bullet.render(camera, screen)
+
+        for green in greens:
+            screen.blit(green.surf, (selected_troop.rect.midbottom[0] - camera.x - green.rect.width // 2, selected_troop.rect.midbottom[1] - camera.y))
+
+        for red in reds:
+            screen.blit(red.surf, (selected_enemy_troop.rect.midbottom[0] - camera.x - red.rect.width // 2, selected_enemy_troop.rect.midbottom[1] - camera.y))
+
 
         # Render objects
         command_center.render(camera, screen)
@@ -276,18 +304,13 @@ def main():
         depot.render(camera, screen)
         red_troop.render(camera, screen)
         blue_troop.render(camera, screen)
-        blue_tank.render(camera, screen)
+        #blue_tank.render(camera, screen)
         starship_grey.render(camera, screen)
         starship_red.render(camera, screen)
 
-        if selected_troop:
-            screen.blit(green_indicator.surf, (selected_troop.rect.midbottom[0] - camera.x - green_indicator.rect.width // 2, selected_troop.rect.midbottom[1] - camera.y))
-
-        if selected_enemy_troop:
-            screen.blit(red_indicator.surf, (selected_enemy_troop.rect.midbottom[0] - camera.x - red_indicator.rect.width // 2, selected_enemy_troop.rect.midbottom[1] - camera.y))
-
-        # Update the display
         pygame.display.update()
+        clock = pygame.time.Clock()
+        clock.tick(60)
 
 if __name__ == "__main__":
     main()
