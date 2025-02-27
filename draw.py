@@ -32,9 +32,13 @@ class Vector2:
     __rmul__ = __mul__
 
 class GameObject:
-    def __init__(self, sprite: str, position: tuple):
+    def __init__(self, sprite: str, position: tuple | Vector2, owner: int = 0):
         self.sprite = sprite
-        self.position = Vector2(position[0], position[1])
+        if isinstance(position, tuple):
+            self.position = Vector2(position[0], position[1])
+        else:
+            self.position = position
+        self.owner = owner
         self.surf = pygame.image.load(self.sprite)
         self.rect = self.surf.get_rect(topleft=tuple(self.position))
     
