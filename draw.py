@@ -380,8 +380,6 @@ def main():
                     cam_pos = get_camera_position(camera, world_size, screen_size)
                     troop.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
 
-            # Camera movement
-
             keys = pygame.key.get_pressed()
 
             if keys[pygame.K_w]:  # Move up
@@ -402,13 +400,12 @@ def main():
                 pygame.quit()
                 exit()
 
-            if event.type == pygame.KEYDOWN:
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_e] and isinstance(selected_building, Building):
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                if isinstance(selected_building, Building):
                     spawn_x = selected_building.rect.right + 20
-                    spawn_y = selected_building.rect.centery + random.randint(-80, 80)
-                    red_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(40, 50))
-                    red_troop.scale((.25, .25))
+                    spawn_y = selected_building.rect.centery
+                    red_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, int(40-50))
+                    red_troop.scale(GLOBAL_SCALE)
                     troops.append(red_troop)
 
             if event.type == pygame.KEYDOWN:
