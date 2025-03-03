@@ -64,10 +64,6 @@ class Building(GameObject):
         self.health = max_health
         self.indicator = None
 
-    def render(self, camera, screen):
-        super().render(camera, screen)
-        pygame.draw.rect(screen, (255, 0, 0), self.rect, 2)
-
 class Troop(GameObject):
     def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, sight_range: int = 250, shot_cooldown: int = 1):
         super().__init__(sprite, position)
@@ -125,7 +121,7 @@ class Troop(GameObject):
 
     def projectile(self):
         speed = 50
-        damage = random.randint(40, 50)
+        damage = self.damage
         bullet = Troop("imgs/b1.png", (self.position.x, self.position.y), 1, speed, damage, 0)
         bullet.scale((.5, .5))
         bullets.append(bullet)
@@ -149,6 +145,26 @@ def barraks_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: li
             bgreen.scale((.15, .15))
             bgreens.append(bgreen)
             return barrack
+    return None
+
+def depot_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
+    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
+    for depot in building_barracks:
+        if depot.rect.collidepoint(cam_offset.x, cam_offset.y):
+            bgreen = Indicator('imgs/green.png')
+            bgreen.scale((.15, .15))
+            bgreens.append(bgreen)
+            return depot
+    return None
+
+def starport_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
+    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
+    for starport in building_barracks:
+        if starport.rect.collidepoint(cam_offset.x, cam_offset.y):
+            bgreen = Indicator('imgs/green.png')
+            bgreen.scale((.15, .15))
+            bgreens.append(bgreen)
+            return starport
     return None
 
 
@@ -194,10 +210,10 @@ def main():
     ]
 
     # Load game objects
-    starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, int(200-250))
+    starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
     starship_grey.scale(GLOBAL_SCALE)
 
-    starship_red = Troop('imgs/red_ship.png', (600, 1000), 700, 2, int(70-80))
+    starship_red = Troop('imgs/red_ship.png', (600, 1000), 700, 2, random.randint(80, 100))
     starship_red.scale(GLOBAL_SCALE)
 
     command_center = Building('imgs/command_center.png', (100, 100), 2000)
@@ -218,7 +234,8 @@ def main():
     troop = None
     selected_building = None
     enemy_troop = None
-    troops = [red_troop, starship_red]
+    global troops
+    troops = [starship_red]
     global bullets
     bullets = []
     global greens
@@ -246,6 +263,12 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 selected_building = barraks_troop_spawn(pygame.mouse.get_pos(), camera, building_barracks)
 
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                selected_building = depot_troop_spawn(pygame.mouse.get_pos(), camera, building_barracks)
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                selected_building = starport_troop_spawn(pygame.mouse.get_pos(), camera, building_barracks)
+
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 troop = select_troop(pygame.mouse.get_pos(), camera, troops, troop)
@@ -260,7 +283,9 @@ def main():
                     starship_red.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
 
             # Camera movement
+
             keys = pygame.key.get_pressed()
+
             if keys[pygame.K_w]:  # Move up
                 camera.y = max(camera.y - camera_speed, 0)
             if keys[pygame.K_s]:  # Move down
@@ -281,6 +306,13 @@ def main():
 
             if event.type == pygame.KEYDOWN:
                 keys = pygame.key.get_pressed()
+                if keys[pygame.K_e] and selected_building == barracks:
+                    red_troop = Troop('imgs/red_soildger.png', (selected_building.rect.centerx, selected_building.rect.bottom + 20), 150, 10, random.randint(40, 50))
+                    red_troop.scale((.25, .25))
+                    troops.append(red_troop)
+
+            if event.type == pygame.KEYDOWN:
+                keys = pygame.key.get_pressed()
                 if keys[pygame.K_t]:
                     blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 60, 10, int(150-180))
                     blue_tank.scale((.2, .2))
@@ -297,10 +329,13 @@ def main():
         for pos in background_tiles:
             screen.blit(background.surf, (pos[0] - camera.x, pos[1] - camera.y))
 
-        red_troop.move(camera, screen)
         blue_troop.move(camera, screen)
         starship_grey.move(camera, screen)
         starship_red.move(camera, screen)
+
+        for red_troop in troops:
+            red_troop.move(camera, screen)
+            red_troop.render(camera, screen)
 
         for blue_tank in enemy_troops:
             blue_tank.move(camera, screen)
@@ -322,12 +357,10 @@ def main():
             if troop:
                 screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
 
-
         # Render objects
         command_center.render(camera, screen)
         starport.render(camera, screen)
         depot.render(camera, screen)
-        red_troop.render(camera, screen)
         blue_troop.render(camera, screen)
         #blue_tank.render(camera, screen)
         starship_grey.render(camera, screen)
