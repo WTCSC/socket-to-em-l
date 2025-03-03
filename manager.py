@@ -1,6 +1,7 @@
 import draw
 import json
 import inspect
+import random
 
 
 class GameObjParser(json.JSONEncoder):
@@ -71,42 +72,39 @@ str_to_obj = {
     "Vector2": draw.Vector2
 }
 
-game = draw.initialize("player_1")
+game: dict[str, list[draw.GameObject]] = {"p1_troops": [], "p2_troops": [], "p1_buildings": [], "p2_buildings": [], "bullets": []}
 
 GLOBAL_SCALE = (.25, .25)
 # Load game objects
-starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 400, 2, 200)
+
+starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
 starship_grey.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["troops"].append(starship_grey)
+game["p1_troops"].append(starship_grey)
 
-command_center = draw.Building('imgs/command_center.png', (100, 100), 3000)
-command_center.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["buildings"].append(command_center)
+starship_red = draw.Troop('imgs/red_ship.png', (600, 1000), 700, 2, random.randint(80, 100))
+starship_red.scale(GLOBAL_SCALE)
+game["p1_troops"].append(starship_red)
 
-barracks = draw.Building('imgs/barracks.png', (400, 150), 1250)
-barracks.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["buildings"].append(barracks)
+command_center = draw.Building('imgs/command_center.png', (100, 100), 2000)
+command_center.scale((.5, .5))
+game["p1_buildings"].append(command_center)
 
 starport = draw.Building('imgs/starport.png', (150, 450), 750)
-starport.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["buildings"].append(starport)
+starport.scale((.65, .65))
+game["p1_buildings"].append(starport)
 
-depot = draw.Building('imgs/vehicle_depot.png', (375, 350), 1500)
-depot.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["buildings"].append(depot)
+depot = draw.Building('imgs/vehicle_depot.png', (445, 450), 1250)
+depot.scale((.3, .3))
+game["p1_buildings"].append(depot)
 
-red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 75, 20, 40)
+red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 150, 10, int(40-50))
 red_troop.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["troops"].append(red_troop)
+game["p1_troops"].append(red_troop)
 
-blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 75, 5, 40)
+blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
 blue_troop.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["troops"].append(blue_troop)
+game["p1_troops"].append(blue_troop)
 
 # print(parse_data(game_to_data()))
 
-clock = draw.pygame.time.Clock()
-
-while True:
-    draw.process_frame(game)
-    clock.tick(60)
+draw.main(game, "p1")
