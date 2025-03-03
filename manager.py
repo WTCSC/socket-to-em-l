@@ -81,19 +81,19 @@ game.game_objects["player_1"]["troops"].append(starship_grey)
 
 command_center = draw.Building('imgs/command_center.png', (100, 100), 3000)
 command_center.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["building_barracks"].append(command_center)
+game.game_objects["player_1"]["buildings"].append(command_center)
 
 barracks = draw.Building('imgs/barracks.png', (400, 150), 1250)
 barracks.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["building_barracks"].append(barracks)
+game.game_objects["player_1"]["buildings"].append(barracks)
 
 starport = draw.Building('imgs/starport.png', (150, 450), 750)
 starport.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["building_barracks"].append(starport)
+game.game_objects["player_1"]["buildings"].append(starport)
 
 depot = draw.Building('imgs/vehicle_depot.png', (375, 350), 1500)
 depot.scale(GLOBAL_SCALE)
-game.game_objects["player_1"]["building_barracks"].append(depot)
+game.game_objects["player_1"]["buildings"].append(depot)
 
 red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 75, 20, 40)
 red_troop.scale(GLOBAL_SCALE)
@@ -102,6 +102,8 @@ game.game_objects["player_1"]["troops"].append(red_troop)
 blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 75, 5, 40)
 blue_troop.scale(GLOBAL_SCALE)
 game.game_objects["player_1"]["troops"].append(blue_troop)
+
+# print(parse_data(game_to_data()))
 
 clock = draw.pygame.time.Clock()
 

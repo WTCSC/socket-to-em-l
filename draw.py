@@ -129,7 +129,7 @@ class Troop(GameObject):
         
 
 class Game:
-    def __init__(self, player, screen, camera: Vector2, camera_speed: int, background: GameObject, background_tiles):
+    def __init__(self, player, screen: pygame.Surface, camera: Vector2, camera_speed: int, background: GameObject, background_tiles):
         self.player = player
         self.screen = screen
         self.camera = camera
@@ -243,7 +243,7 @@ def process_frame(game: Game):
     if game.selected_object:
         green = Indicator('imgs/green.png')
         green.scale((.15, .15))
-        game.screen.blit(green.surf, (troop.rect.midbottom[0] - game.camera.x - green.rect.width // 2, troop.rect.midbottom[1] - game.camera.y))
+        game.screen.blit(green.surf, (game.selected_object.rect.midbottom[0] - game.camera.x - green.rect.width // 2, game.selected_object.rect.midbottom[1] - game.camera.y))
 
     pygame.display.update()
 
