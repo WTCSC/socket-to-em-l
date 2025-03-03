@@ -403,7 +403,7 @@ def main():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 if isinstance(selected_building, Building):
                     spawn_x = selected_building.rect.right + 20
-                    spawn_y = selected_building.rect.centery
+                    spawn_y = selected_building.rect.centery + random.randint(-80, 80)
                     red_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, int(40-50))
                     red_troop.scale(GLOBAL_SCALE)
                     troops.append(red_troop)
