@@ -284,6 +284,9 @@ def select_troop(mouse_pos: tuple, camera: Vector2, troops: list[Troop], troop: 
     cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
     for troop in troops:
         if troop.rect.collidepoint(cam_offset.x, cam_offset.y):
+            green = Indicator('imgs/green.png')
+            green.scale((.15, .15))
+            greens.append(green)
             return troop
     return None
 
@@ -460,7 +463,6 @@ def main():
 
 
         for green in greens:
-            if troop:
                 screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
 
         # Render objects
