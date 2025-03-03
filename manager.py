@@ -15,14 +15,14 @@ class GameObjParser(json.JSONEncoder):
 
 def parse_data(data: str):
     parsed: dict[str, list[dict[str, str | dict]]] = json.loads(data)
-    game_obj = draw.Game()
+    game_objects = {}
     for player in parsed:
-        game_obj.game_objects[player] = []
+        game_objects[player] = []
         for game_object in parsed.get(player):
             obj_class = str_to_obj[game_object["class"]]
             attributes = {k: v for k, v in game_object["data"].items() if v != "z"}
-            game_obj.game_objects[player].append(data_to_obj(obj_class, attributes))
-    return game_obj
+            game_objects[player].append(data_to_obj(obj_class, attributes))
+    return game_objects
 
 def data_to_obj(obj_class, data):
     for key in data:
@@ -71,37 +71,40 @@ str_to_obj = {
     "Vector2": draw.Vector2
 }
 
-game = draw.Game()
-game.game_objects["player_1"] = []
+game = draw.initialize("player_1")
 
 GLOBAL_SCALE = (.25, .25)
 # Load game objects
 starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 400, 2, 200)
 starship_grey.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(starship_grey)
+game.game_objects["player_1"]["troops"].append(starship_grey)
 
 command_center = draw.Building('imgs/command_center.png', (100, 100), 3000)
 command_center.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(command_center)
+game.game_objects["player_1"]["building_barracks"].append(command_center)
 
 barracks = draw.Building('imgs/barracks.png', (400, 150), 1250)
 barracks.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(barracks)
+game.game_objects["player_1"]["building_barracks"].append(barracks)
 
 starport = draw.Building('imgs/starport.png', (150, 450), 750)
 starport.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(starport)
+game.game_objects["player_1"]["building_barracks"].append(starport)
 
 depot = draw.Building('imgs/vehicle_depot.png', (375, 350), 1500)
 depot.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(depot)
+game.game_objects["player_1"]["building_barracks"].append(depot)
 
 red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 75, 20, 40)
 red_troop.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(red_troop)
+game.game_objects["player_1"]["troops"].append(red_troop)
 
 blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 75, 5, 40)
 blue_troop.scale(GLOBAL_SCALE)
-game.game_objects["player_1"].append(blue_troop)
+game.game_objects["player_1"]["troops"].append(blue_troop)
 
-print(parse_data(game_to_data()).game_objects)
+clock = draw.pygame.time.Clock()
+
+while True:
+    draw.process_frame(game)
+    clock.tick(60)
