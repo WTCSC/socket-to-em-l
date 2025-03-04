@@ -46,7 +46,10 @@ class GameObject:
         screen.blit(self.surf, (self.rect.x - camera.x, self.rect.y - camera.y))
     
     def scale(self, factor: tuple):
-        self.surf = pygame.transform.scale(self.surf, (self.rect.width * factor[0], self.rect.height * factor[1]))
+        self.surf = pygame.transform.scale(
+            self.surf, 
+            (int(self.rect.width * factor[0]), int(self.rect.height * factor[1]))
+        )
         self.rect.size = (self.surf.get_width(), self.surf.get_height())
 
     def size(self, size: tuple):
@@ -62,7 +65,6 @@ class Building(GameObject):
         super().__init__(sprite, position)
         self.max_health = max_health
         self.health = max_health
-        self.rally = None
 
 class Troop(GameObject):
     def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, sight_range: int = 250, shot_cooldown: int = 1):
@@ -77,13 +79,12 @@ class Troop(GameObject):
         self.sight_range = sight_range
         self.shot_cooldown = shot_cooldown
         self.time_since_shot = 0
-        self.indicator = None
 
     def stop(self):
         self.velocity = Vector2(0, 0)
 
     def move(self, camera, screen):
-    # Enemy targeting
+        # Enemy targeting
         if self.enemy_target:
             distance_to_enemy = (self.position - self.enemy_target.position).length
 
@@ -122,7 +123,6 @@ class Troop(GameObject):
             self.position.y += self.velocity.y
             self.rect.topleft = (self.position.x, self.position.y)
 
-
     def goto(self, position: Vector2):
         direction = Vector2(position.x - self.position.x, position.y - self.position.y)
         self.velocity = direction.normalize() * self.speed
@@ -135,181 +135,33 @@ class Troop(GameObject):
         bullets.append(bullet)
         bullet.enemy_target = self.enemy_target
         
-
-class Game:
-    def __init__(self, player, screen: pygame.Surface, camera: Vector2, camera_speed: int, background: GameObject, background_tiles):
-        self.player = player
-        self.screen = screen
-        self.camera = camera
-        self.camera_speed = camera_speed
-        self.background = background
-        self.background_tiles = background_tiles
-        self.selected_object: GameObject | None = None
-        self.game_objects: dict[str, dict[str, list[GameObject]]] = {"player_1": {"buildings": [], "troops": [], "bullets": []}, "player_1": {"buildings": [], "troops": [], "bullets": []}}
-    
-    def get_player_objects(self, player = None):
-        if player is None:
-            player = self.player
-
-        return self.game_objects[player]
-
-
-def initialize(player):
-    # Initialize pygame
-    pygame.init()
-
-    screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN | pygame.SCALED)
-
-    # Camera setup
-    camera = Vector2(0, 0)
-    camera_speed = 30
-
-    # Load background
-    background = GameObject('imgs/background_grid.png', (0, 0))
-    background.size((3000, 2000))
-
-    # Define background tiling positions
-    background_tiles = [
-        (0, 0), (3000, 0),
-        (0, 2000), (3000, 2000)
-    ]
-    return Game(player, screen, camera, camera_speed, background, background_tiles)
-
-def process_frame(game: Game):
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-
-        mouse_pos = pygame.mouse.get_pos()
-        world_size = (game.background.rect.width * 2, game.background.rect.height * 2)
-        screen_size = game.screen.get_size()
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            game.selected_object = barraks_troop_spawn(pygame.mouse.get_pos(), game.camera, game.get_player_objects()["buildings"])
-
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            game.selected_object = select_troop(pygame.mouse.get_pos(), game.camera, game.get_player_objects()["troops"])
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and isinstance(game.selected_object, Troop):
-            cam_pos = get_camera_position(game.camera, world_size, screen_size)
-            game.selected_object.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
-
-        # Camera movement
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_w]:  # Move up
-            game.camera.y = max(game.camera.y - game.camera_speed, 0)
-        if keys[pygame.K_s]:  # Move down
-            game.camera.y = min(game.camera.y + game.camera_speed, (game.background.rect.height * 2) - game.screen.get_height())
-        if keys[pygame.K_a]:  # Move left
-            game.camera.x = max(game.camera.x - game.camera_speed, 0)
-        if keys[pygame.K_d]:  # Move right
-            game.camera.x = min(game.camera.x + game.camera_speed, (game.background.rect.width * 2) - game.screen.get_width())
-        if keys[pygame.K_u]:
-            game.selected_object = None
-        if keys[pygame.K_c] and game.selected_object in game.get_player_objects()["troops"]:
-            selected_enemy_troop = select_enemy_troop(pygame.mouse.get_pos(), game.camera, [game.game_objects[i]["troops"] for i in game.game_objects if i != game.player])
-            if selected_enemy_troop and isinstance(game.selected_object, Troop):
-                game.selected_object.enemy_target = selected_enemy_troop
-        if keys[pygame.K_ESCAPE]:
-            pygame.quit()
-            exit()
-
-        if event.type == pygame.KEYDOWN:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_t]:
-                blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 60, 10, int(150-180))
-                blue_tank.scale((.2, .2))
-                game.game_objects["player_2"]["troops"].append(blue_tank)
-
-        if event.type == pygame.KEYDOWN:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_b]:
-                barracks = Building('imgs/barracks.png', (450, 185), 1000)
-                barracks.scale((.29, .29))
-                game.game_objects["player_1"]["buildings"].append(barracks)
-
-    # Render background tiles
-    for pos in game.background_tiles:
-        game.screen.blit(game.background.surf, (pos[0] - game.camera.x, pos[1] - game.camera.y))
-
-    # Render each game object
-    for player_dict in game.game_objects.values():
-        for troop in player_dict["troops"]:
-            troop.move(game.camera, game.screen)
-            troop.render(game.camera, game.screen)
-        
-        for barrack in player_dict["buildings"]:
-            barrack.render(game.camera, game.screen)
-        
-        for bullet in player_dict["bullets"]:
-            bullet.move(game.camera, game.screen)
-            bullet.render(game.camera, game.screen)
-
-    if game.selected_object:
-        green = Indicator('imgs/green.png')
-        green.scale((.15, .15))
-        game.screen.blit(green.surf, (game.selected_object.rect.midbottom[0] - game.camera.x - green.rect.width // 2, game.selected_object.rect.midbottom[1] - game.camera.y))
-
-    pygame.display.update()
-
-def get_camera_position(camera: Vector2, world_size: tuple, screen_size: tuple) -> tuple:
+def get_camera_position(camera: Vector2, world_size: tuple, screen_size: tuple) -> Vector2:
     camera_x = max(0, min(camera.x, world_size[0] - screen_size[0]))
     camera_y = max(0, min(camera.y, world_size[1] - screen_size[1]))
     return Vector2(camera_x, camera_y)
 
-def barraks_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
-    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
-    for barracks in building_barracks:
-        if barracks.rect.collidepoint(cam_offset.x, cam_offset.y):
-            bgreen = Indicator('imgs/green.png')
-            bgreen.scale((.15, .15))
-            bgreens.append(bgreen)
-            return barracks
-    return None
+# Global list for currently selected objects
+selected_objects = []
 
-def depot_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
+# --- Modified Selection Function ---
+# This function checks for both buildings and troops that collide with the mouse position
+# and returns a list of all such objects.
+def select_objects(mouse_pos: tuple, camera: Vector2, troops: list[Troop], buildings: list[Building]) -> list[GameObject]:
     cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
-    for depot in building_barracks:
-        if depot.rect.collidepoint(cam_offset.x, cam_offset.y):
-            bgreen = Indicator('imgs/green.png')
-            bgreen.scale((.15, .15))
-            bgreens.append(bgreen)
-            return depot
-    return None
+    candidates = []
 
-def starport_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
-    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
-    for starport in building_barracks:
-        if starport.rect.collidepoint(cam_offset.x, cam_offset.y):
-            bgreen = Indicator('imgs/green.png')
-            bgreen.scale((.15, .15))
-            bgreens.append(bgreen)
-            return starport
-    return None
-
-def command_center_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
-    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
-    for command in building_barracks:
-        if command.rect.collidepoint(cam_offset.x, cam_offset.y):
-            bgreen = Indicator('imgs/green.png')
-            bgreen.scale((.15, .15))
-            bgreens.append(bgreen)
-            return command
-    return None
-
-def select_troop(mouse_pos: tuple, camera: Vector2, troops: list[Troop], troop: Troop = None) -> Troop:
-    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
+    # Check buildings
+    for building in buildings:
+        if building.rect.collidepoint(cam_offset.x, cam_offset.y):
+            candidates.append(building)
+    
+    # Check troops
     for troop in troops:
         if troop.rect.collidepoint(cam_offset.x, cam_offset.y):
-            green = Indicator('imgs/green.png')
-            green.scale((.15, .15))
-            greens.append(green)
-            return troop
-    return None
+            candidates.append(troop)
+    return candidates
 
-def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Troop], enemy_troop: Troop = None) -> Troop:
+def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Troop]) -> Troop | None:
     cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
     for enemy_troop in enemy_troops:
         if enemy_troop.rect.collidepoint(cam_offset.x, cam_offset.y):
@@ -317,53 +169,41 @@ def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Tro
     return None
 
 def main(game: dict, player: str):
-    # Initialize pygame
     pygame.init()
-
     screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN | pygame.SCALED)
     GLOBAL_SCALE = (.25, .25)
 
-    # Camera setup
     camera = Vector2(0, 0)
     camera_speed = 30
 
-    # Load background
     background = GameObject('imgs/background_grid.png', (0, 0))
     background.size((3000, 2000))
-
-    # Define background tiling positions
-    background_tiles = [
-        (0, 0), (3000, 0),
-        (0, 2000), (3000, 2000)
-    ]
+    background_tiles = [(0, 0), (3000, 0), (0, 2000), (3000, 2000)]
 
     other_player = "p2" if player == "p1" else "p1"
-    # Load game objects
+    # Example troops for demonstration.
     starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
     starship_grey.scale(GLOBAL_SCALE)
 
-    blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
+    blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 150, 10, random.randint(40, 50))
     blue_troop.scale(GLOBAL_SCALE)
 
-    troop = None
-    selected_building = None
-    enemy_troop = None
+    # Use the global list for multi-selection instead of a single variable.
+    global selected_objects
+
     global troops
     troops = game[f"{player}_troops"]
     global enemy_troops
     enemy_troops = game[f"{other_player}_troops"]
     global bullets
     bullets = game["bullets"]
-    global greens
-    greens = []
-    global bgreens
-    bgreens = []
     global buildings
     buildings = game[f"{player}_buildings"]
     global enemy_buildings
     enemy_buildings = game[f"{other_player}_buildings"]
     global rallys
     rallys = []
+    rally = None
 
     clock = pygame.time.Clock()
     while True:
@@ -376,103 +216,126 @@ def main(game: dict, player: str):
             world_size = (background.rect.width * 2, background.rect.height * 2)
             screen_size = screen.get_size()
 
+            # --- Left Click: Selection ---
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                selected_building = barraks_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
+                keys = pygame.key.get_pressed()
+                # If shift is not held, clear previous selection.
+                if not keys[pygame.K_LSHIFT] and not keys[pygame.K_RSHIFT]:
+                    selected_objects.clear()
+                # Add every object under the mouse to the selection list.
+                new_selections = select_objects(mouse_pos, camera, troops, buildings)
+                for obj in new_selections:
+                    if obj not in selected_objects:
+                        selected_objects.append(obj)
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                selected_building = command_center_spawn(pygame.mouse.get_pos(), camera, buildings)
-
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                selected_building = depot_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
-
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                selected_building = starport_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
-
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                troop = select_troop(pygame.mouse.get_pos(), camera, troops, troop)
-
+            # --- Right Click: Set Target or Rally ---
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
                 cam_pos = get_camera_position(camera, world_size, screen_size)
-                if selected_building:
-                    rally = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos  # Update rally point for building
-                    flag = Building('imgs/rally.png', rally, 1)
+                # If any Building is selected, update its rally point.
+                building_selected = None
+                for obj in selected_objects:
+                    if isinstance(obj, Building):
+                        building_selected = obj
+                        break
+                if building_selected:
+                    rally = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
+                    flag = Building('imgs/rally.png', (rally.x, rally.y), 1)
                     flag.scale((.2, .2))
                     rallys.append(flag)
                 else:
-                    troop.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
-
+                    # Otherwise, assign the target to every selected Troop.
+                    for obj in selected_objects:
+                        if isinstance(obj, Troop):
+                            obj.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
 
             keys = pygame.key.get_pressed()
-
-            if keys[pygame.K_w]:  # Move up
+            if keys[pygame.K_w]:
                 camera.y = max(camera.y - camera_speed, 0)
-            if keys[pygame.K_s]:  # Move down
+            if keys[pygame.K_s]:
                 camera.y = min(camera.y + camera_speed, (background.rect.height * 2) - screen.get_height())
-            if keys[pygame.K_a]:  # Move left
+            if keys[pygame.K_a]:
                 camera.x = max(camera.x - camera_speed, 0)
-            if keys[pygame.K_d]:  # Move right
+            if keys[pygame.K_d]:
                 camera.x = min(camera.x + camera_speed, (background.rect.width * 2) - screen.get_width())
-            if keys[pygame.K_u]:
-                troop = None
-            if keys[pygame.K_c] and troop in troops:
-                selected_enemy_troop = select_enemy_troop(pygame.mouse.get_pos(), camera, enemy_troops, enemy_troop)
-                if selected_enemy_troop:
-                    troop.enemy_target = selected_enemy_troop
             if keys[pygame.K_ESCAPE]:
                 pygame.quit()
                 exit()
 
+            # Clear selection using the U key.
+            if keys[pygame.K_u]:
+                selected_objects.clear()
+
+            # Use the C key to target an enemy troop (applied to each selected Troop)
+            if keys[pygame.K_c]:
+                selected_enemy = select_enemy_troop(mouse_pos, camera, enemy_troops)
+                if selected_enemy:
+                    for obj in selected_objects:
+                        if isinstance(obj, Troop):
+                            obj.enemy_target = selected_enemy
+
+            # Spawn new units from a selected building using the E key.
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                if isinstance(selected_building, Building):
-                    spawn_x = selected_building.rect.right + random.randint(10,40)
-                    spawn_y = selected_building.rect.centery + random.randint(-80, 80)
+                for obj in selected_objects:
+                    if isinstance(obj, Building):
+                        spawn_x = obj.rect.right + random.randint(10, 40)
+                        spawn_y = obj.rect.centery + random.randint(-80, 80)
 
-                    if selected_building.sprite == 'imgs/barracks.png':
-                        #if mineral_count == 50:
-                        if rally is not None:
-                            new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
-                            new_troop.scale(GLOBAL_SCALE)
-                            new_troop.target = rally
-                            troops.append(new_troop)
-
-                    elif selected_building.sprite == 'imgs/command_center.png':
-                        #if mineral_count == 50:
-                        if rally is not None:
-                            new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
-                            new_collector.scale((.12, .12))
-                            new_collector.target = rally
-                            troops.append(new_collector)
-
-                    elif selected_building.sprite == 'imgs/starport.png':
-                        #if mineral_count == 150:
-                        if rally is not None:
-                            new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
-                            new_ship.scale(GLOBAL_SCALE)
-                            new_ship.target = rally
-                            troops.append(new_ship)
-
-                    elif selected_building.sprite == 'imgs/vehicle_depot.png':
-                        #if mineral_count == 300:
-                        if rally is not None:
-                            new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
-                            new_tank.scale((.15, .15))
-                            new_tank.target = rally
-                            troops.append(new_tank)
+                        if len(troops) == 50:
+                            print("Troop limit reached")
+                        else:
+                            if obj.sprite == 'imgs/barracks.png':
+                                if rally is not None:
+                                    new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                    new_troop.scale(GLOBAL_SCALE)
+                                    new_troop.target = rally
+                                    troops.append(new_troop)
+                                else:
+                                    new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                    new_troop.scale(GLOBAL_SCALE)
+                                    troops.append(new_troop)
+                            elif obj.sprite == 'imgs/command_center.png':
+                                if rally is not None:
+                                    new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                    new_collector.scale((.12, .12))
+                                    troops.append(new_collector)
+                                else:
+                                    new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                    new_collector.scale((.12, .12))
+                                    new_collector.target = rally
+                                    troops.append(new_collector)
+                            elif obj.sprite == 'imgs/starport.png':
+                                if rally is not None:
+                                    new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
+                                    new_ship.scale(GLOBAL_SCALE)
+                                    new_ship.target = rally
+                                    troops.append(new_ship)
+                                else:
+                                    new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
+                                    new_ship.scale(GLOBAL_SCALE)
+                                    troops.append(new_ship)
+                            elif obj.sprite == 'imgs/vehicle_depot.png':
+                                if rally is not None:
+                                    new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
+                                    new_tank.scale((.15, .15))
+                                    new_tank.target = rally
+                                    troops.append(new_tank)
+                                else:
+                                    new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
+                                    new_tank.scale((.15, .15))
+                                    troops.append(new_tank)
 
             if event.type == pygame.KEYDOWN:
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_t]:
-                    blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 60, 10, int(150-180))
+                if event.key == pygame.K_t:
+                    blue_tank = Troop('imgs/blue_tank.png', (1000, 400), 60, 10, random.randint(150, 180))
                     blue_tank.scale((.2, .2))
                     enemy_troops.append(blue_tank)
 
             if event.type == pygame.KEYDOWN:
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_b]:
+                if event.key == pygame.K_b:
                     barracks = Building('imgs/barracks.png', (450, 185), 1000)
                     barracks.scale((.29, .29))
                     buildings.append(barracks)
-                    starport = starport = Building('imgs/starport.png', (150, 450), 750)
+                    starport = Building('imgs/starport.png', (150, 450), 750)
                     starport.scale((.65, .65))
                     buildings.append(starport)
                     depot = Building('imgs/vehicle_depot.png', (445, 450), 1250)
@@ -486,36 +349,45 @@ def main(game: dict, player: str):
         for pos in background_tiles:
             screen.blit(background.surf, (pos[0] - camera.x, pos[1] - camera.y))
 
+        # Update and render troops
         for troop in troops:
             troop.move(camera, screen)
             troop.render(camera, screen)
-
-        for troop in enemy_troops:
-            troop.move(camera, screen)
-            troop.render(camera, screen)
-
+        for enemy in enemy_troops:
+            enemy.move(camera, screen)
+            enemy.render(camera, screen)
+        
+        # Render buildings
         for building in buildings:
             building.render(camera, screen)
-        
         for building in enemy_buildings:
             building.render(camera, screen)
-
+        
+        # Render bullets
         for bullet in bullets:
             bullet.move(camera, screen)
             bullet.render(camera, screen)
-
-        for rally in rallys:
+        
+        # Render rally flags
+        for flag in rallys:
             flag.render(camera, screen)
-
-        for bgreen in bgreens:
-            if selected_building:
-                screen.blit(bgreen.surf, (selected_building.rect.midbottom[0] - camera.x - bgreen.rect.width // 2, selected_building.rect.midbottom[1] - camera.y))
-
-        if troop is None:
-            greens.clear()
-
-        for green in greens:
-            screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
-
+        
+        # Render selection indicators for each selected object
+        for obj in selected_objects:
+            indicator = Indicator('imgs/green.png')
+            indicator.scale((.15, .15))
+            screen.blit(indicator.surf, (obj.rect.midbottom[0] - camera.x - indicator.rect.width // 2, obj.rect.midbottom[1] - camera.y))
+        
         pygame.display.update()
         clock.tick(60)
+
+if __name__ == "__main__":
+    # Example initialization of game state.
+    game = {
+        "p1_troops": [],
+        "p2_troops": [],
+        "bullets": [],
+        "p1_buildings": [],
+        "p2_buildings": []
+    }
+    main(game, "p1")
