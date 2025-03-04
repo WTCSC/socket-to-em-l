@@ -204,6 +204,8 @@ def main(game: dict, player: str):
     global rallys
     rallys = []
     rally = None
+    mineral_count = 50
+    troop_limit = 0
 
     clock = pygame.time.Clock()
     while True:
@@ -218,15 +220,16 @@ def main(game: dict, player: str):
 
             # --- Left Click: Selection ---
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                keys = pygame.key.get_pressed()
-                # If shift is not held, clear previous selection.
-                if not keys[pygame.K_LSHIFT] and not keys[pygame.K_RSHIFT]:
-                    selected_objects.clear()
-                # Add every object under the mouse to the selection list.
-                new_selections = select_objects(mouse_pos, camera, troops, buildings)
-                for obj in new_selections:
-                    if obj not in selected_objects:
-                        selected_objects.append(obj)
+                if keys[pygame.K_c]:
+                    pass
+                else:
+                    keys = pygame.key.get_pressed()
+                    if not keys[pygame.K_LSHIFT] and not keys[pygame.K_RSHIFT]:
+                        selected_objects.clear()
+                    new_selections = select_objects(mouse_pos, camera, troops, buildings)
+                    for obj in new_selections:
+                        if obj not in selected_objects:
+                            selected_objects.append(obj)
 
             # --- Right Click: Set Target or Rally ---
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
@@ -280,49 +283,118 @@ def main(game: dict, player: str):
                         spawn_x = obj.rect.right + random.randint(10, 40)
                         spawn_y = obj.rect.centery + random.randint(-80, 80)
 
-                        if len(troops) == 50:
-                            print("Troop limit reached")
-                        else:
-                            if obj.sprite == 'imgs/barracks.png':
-                                if rally is not None:
+                        if obj.sprite == 'imgs/barracks.png':
+                            if rally is not None:
+                                if troop_limit <= 48 and mineral_count >= 50:
+                                    mineral_count -= 50
                                     new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
                                     new_troop.scale(GLOBAL_SCALE)
                                     new_troop.target = rally
+                                    troop_limit += 2
                                     troops.append(new_troop)
                                 else:
+                                    if troop_limit > 48:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                            else:
+                                if troop_limit <= 48 and mineral_count >= 50:
+                                    mineral_count -= 50
                                     new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
                                     new_troop.scale(GLOBAL_SCALE)
+                                    troop_limit += 2
                                     troops.append(new_troop)
-                            elif obj.sprite == 'imgs/command_center.png':
-                                if rally is not None:
-                                    new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
-                                    new_collector.scale((.12, .12))
-                                    troops.append(new_collector)
                                 else:
+                                    if troop_limit > 48:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                        elif obj.sprite == 'imgs/command_center.png':
+                            if rally is not None:
+                                if troop_limit <= 49 and mineral_count >= 50:
+                                    mineral_count -= 50
                                     new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
                                     new_collector.scale((.12, .12))
                                     new_collector.target = rally
+                                    troop_limit += 1
                                     troops.append(new_collector)
-                            elif obj.sprite == 'imgs/starport.png':
-                                if rally is not None:
+                                else:
+                                    if troop_limit > 49:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                            else:
+                                if troop_limit <= 49 and mineral_count >= 50:
+                                    mineral_count -= 50
+                                    new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                    new_collector.scale((.12, .12))
+                                    troop_limit += 1
+                                    troops.append(new_collector)
+                                else:
+                                    if troop_limit > 49:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                        elif obj.sprite == 'imgs/starport.png':
+                            if rally is not None:
+                                if troop_limit <= 46 and mineral_count >= 250:
+                                    mineral_count -= 250
                                     new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
                                     new_ship.scale(GLOBAL_SCALE)
                                     new_ship.target = rally
+                                    troop_limit += 6
                                     troops.append(new_ship)
                                 else:
+                                    if troop_limit > 44:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                            else:
+                                if troop_limit <= 44 and mineral_count >= 250:
+                                    mineral_count -= 250
                                     new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
                                     new_ship.scale(GLOBAL_SCALE)
+                                    troop_limit += 6
                                     troops.append(new_ship)
-                            elif obj.sprite == 'imgs/vehicle_depot.png':
-                                if rally is not None:
+                                else:
+                                    if troop_limit > 44:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                        elif obj.sprite == 'imgs/vehicle_depot.png':
+                            if rally is not None:
+                                if troop_limit <= 46 and mineral_count >= 150:
+                                    mineral_count -= 150
                                     new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
                                     new_tank.scale((.15, .15))
                                     new_tank.target = rally
+                                    troop_limit += 4
                                     troops.append(new_tank)
                                 else:
+                                    if troop_limit > 46:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
+                            else:
+                                if troop_limit <= 46 and mineral_count >= 150:
+                                    mineral_count -= 150
                                     new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
                                     new_tank.scale((.15, .15))
+                                    troop_limit += 4
                                     troops.append(new_tank)
+                                else:
+                                    if troop_limit > 46:
+                                        print("Troop limit reached")
+                                    else:
+                                        print("Not enough minerals")
+
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_t:
