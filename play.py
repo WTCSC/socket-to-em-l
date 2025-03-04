@@ -1,13 +1,7 @@
 import connector
-# import manager
-from threading import Thread
-from time import sleep
+import manager
+import draw
 
-def get_input():
-    while True:
-        # Get the player input and send it to the server
-        turn = input()
-        player.send(turn)
 
 # Prompts the user and validates their input based on options
 def prompt(text = "", options = [], error = ""):
@@ -19,6 +13,8 @@ def prompt(text = "", options = [], error = ""):
         user_input = prompt(text, options)
     return user_input
 
+def send_game():
+    player.send(manager.game)
 
 print("Welcome to ____\n")
 
@@ -34,11 +30,7 @@ else:
     player = connector.connect(ip)
 
 try:
-    game_loop = Thread(target=get_input, daemon=True)
-    game_loop.start()
-    while True:
-        sleep(1)
-    # draw.main()
+    draw.main(manager.game, "p1" if is_hosting else "p2")
 except KeyboardInterrupt:
     print("Ending game...")
 except Exception as e:

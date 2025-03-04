@@ -15,15 +15,16 @@ class GameObjParser(json.JSONEncoder):
                 return "z"
 
 def parse_data(data: str):
+    global game
     parsed: dict[str, list[dict[str, str | dict]]] = json.loads(data)
     game_objects = {}
-    for player in parsed:
-        game_objects[player] = []
-        for game_object in parsed.get(player):
+    for list_obj in parsed:
+        game_objects[list_obj] = []
+        for game_object in parsed.get(list_obj):
             obj_class = str_to_obj[game_object["class"]]
             attributes = {k: v for k, v in game_object["data"].items() if v != "z"}
-            game_objects[player].append(data_to_obj(obj_class, attributes))
-    return game_objects
+            game_objects[list_obj].append(data_to_obj(obj_class, attributes))
+    game = game_objects
 
 def data_to_obj(obj_class, data):
     for key in data:
@@ -75,8 +76,8 @@ str_to_obj = {
 game: dict[str, list[draw.GameObject]] = {"p1_troops": [], "p2_troops": [], "p1_buildings": [], "p2_buildings": [], "bullets": []}
 
 GLOBAL_SCALE = (.25, .25)
-# Load game objects
 
+# Load game objects
 starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
 starship_grey.scale(GLOBAL_SCALE)
 game["p1_troops"].append(starship_grey)
@@ -88,14 +89,6 @@ game["p1_troops"].append(starship_red)
 command_center = draw.Building('imgs/command_center.png', (100, 100), 2000)
 command_center.scale((.5, .5))
 game["p1_buildings"].append(command_center)
-
-starport = draw.Building('imgs/starport.png', (150, 450), 750)
-starport.scale((.65, .65))
-game["p1_buildings"].append(starport)
-
-depot = draw.Building('imgs/vehicle_depot.png', (445, 450), 1250)
-depot.scale((.3, .3))
-game["p1_buildings"].append(depot)
 
 red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 150, 10, int(40-50))
 red_troop.scale(GLOBAL_SCALE)

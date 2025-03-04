@@ -3,6 +3,7 @@ import time
 import random
 from math import sqrt
 from sys import exit
+import play
 
 class Vector2:
     def __init__(self, x: float, y: float):
@@ -317,7 +318,7 @@ def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Tro
             return enemy_troop
     return None
 
-def main():
+def main(game: dict, player: str):
     # Initialize pygame
     pygame.init()
 
@@ -338,6 +339,7 @@ def main():
         (0, 2000), (3000, 2000)
     ]
 
+    other_player = "p2" if player == "p1" else "p1"
     # Load game objects
     starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
     starship_grey.scale(GLOBAL_SCALE)
@@ -349,16 +351,19 @@ def main():
     selected_building = None
     enemy_troop = None
     global troops
-    troops = []
+    troops = game[f"{player}_troops"]
+    global enemy_troops
+    enemy_troops = game[f"{other_player}_troops"]
     global bullets
-    bullets = []
+    bullets = game["bullets"]
     global greens
     greens = []
     global bgreens
     bgreens = []
-    global enemy_troops
-    enemy_troops = []
     global buildings
+    buildings = game[f"{player}_buildings"]
+    global enemy_buildings
+    enemy_buildings = game[f"{other_player}_buildings"]
     buildings = []
     global rallys
     rallys = []
@@ -484,18 +489,18 @@ def main():
         for pos in background_tiles:
             screen.blit(background.surf, (pos[0] - camera.x, pos[1] - camera.y))
 
-        blue_troop.move(camera, screen)
-        starship_grey.move(camera, screen)
+        for troop in troops:
+            troop.move(camera, screen)
+            troop.render(camera, screen)
 
-        for red_troop in troops:
-            red_troop.move(camera, screen)
-            red_troop.render(camera, screen)
-
-        for blue_tank in enemy_troops:
-            blue_tank.move(camera, screen)
-            blue_tank.render(camera, screen)
+        for troop in enemy_troops:
+            troop.move(camera, screen)
+            troop.render(camera, screen)
 
         for building in buildings:
+            building.render(camera, screen)
+        
+        for building in enemy_buildings:
             building.render(camera, screen)
 
         for bullet in bullets:
@@ -515,11 +520,8 @@ def main():
         for green in greens:
             screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
 
-        # Render objects
-        blue_troop.render(camera, screen)
-        starship_grey.render(camera, screen)
-
         pygame.display.update()
+        play.send_game()
         clock.tick(60)
 
 if __name__ == "__main__":
