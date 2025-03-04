@@ -3,7 +3,6 @@ import time
 import random
 from math import sqrt
 from sys import exit
-import play
 
 class Vector2:
     def __init__(self, x: float, y: float):
@@ -229,7 +228,6 @@ def process_frame(game: Game):
 
     # Render each game object
     for player_dict in game.game_objects.values():
-        print(player_dict)
         for troop in player_dict["troops"]:
             troop.move(game.camera, game.screen)
             troop.render(game.camera, game.screen)
@@ -357,7 +355,6 @@ def main(game: dict, player: str):
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 selected_building = depot_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
-                print(selected_building)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 selected_building = starport_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
@@ -450,7 +447,6 @@ def main(game: dict, player: str):
             screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
 
         pygame.display.update()
-        play.send_game()
         clock.tick(60)
 
 if __name__ == "__main__":

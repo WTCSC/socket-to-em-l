@@ -1,6 +1,8 @@
 import connector
 import manager
 import draw
+from threading import Thread
+from time import sleep
 
 
 # Prompts the user and validates their input based on options
@@ -14,7 +16,8 @@ def prompt(text = "", options = [], error = ""):
     return user_input
 
 def send_game():
-    player.send(manager.game)
+    # print(manager.game_to_data())
+    player.send(manager.game_to_data())
 
 print("Welcome to ____\n")
 
@@ -22,15 +25,19 @@ is_hosting = prompt("Are you hosting or joining a game?\n1. Hosting\n2. Joining"
 
 # Make the player either a host or a client
 if is_hosting:
-    player_count = 2 #int(prompt("How many people are playing? Choose a number between 2 and 4", ["2", "3", "4"], "\nPlease chose a player count between 2 and 4\n"))
-    player = connector.host_game(player_count)
+    player = connector.host_game()
 else:
     print("What IP address do you want to connect to?")
     ip = input()
     player = connector.connect(ip)
 
 try:
-    draw.main(manager.game, "p1" if is_hosting else "p2")
+    # draw_thread = Thread(target=draw.main, args=[manager.game, "p1" if is_hosting else "p2"])
+    draw_thread = Thread(target=manager.main)
+    draw_thread.start()
+    while True:
+        send_game()
+        sleep(1/20)
 except KeyboardInterrupt:
     print("Ending game...")
 except Exception as e:

@@ -15,6 +15,7 @@ class GameObjParser(json.JSONEncoder):
                 return "z"
 
 def parse_data(data: str):
+    print(data)
     global game
     parsed: dict[str, list[dict[str, str | dict]]] = json.loads(data)
     game_objects = {}
@@ -53,10 +54,10 @@ def data_to_obj(obj_class, data):
 
 def game_to_data():
     data: dict[str, list]= {}
-    for player in game.game_objects:
-        data[player] = []
-        for game_object in game.game_objects.get(player):
-            data[player].append(obj_to_data(game_object))
+    for obj_list in game:
+        data[obj_list] = []
+        for game_object in game.get(obj_list):
+            data[obj_list].append(obj_to_data(game_object))
     return json.dumps(data, skipkeys=True, cls=GameObjParser)
 
 def obj_to_data(game_object):
@@ -77,27 +78,31 @@ game: dict[str, list[draw.GameObject]] = {"p1_troops": [], "p2_troops": [], "p1_
 
 GLOBAL_SCALE = (.25, .25)
 
-# Load game objects
-starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
-starship_grey.scale(GLOBAL_SCALE)
-game["p1_troops"].append(starship_grey)
+def main():
+    # Load game objects
+    starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
+    starship_grey.scale(GLOBAL_SCALE)
+    game["p1_troops"].append(starship_grey)
 
-starship_red = draw.Troop('imgs/red_ship.png', (600, 1000), 700, 2, random.randint(80, 100))
-starship_red.scale(GLOBAL_SCALE)
-game["p1_troops"].append(starship_red)
+    starship_red = draw.Troop('imgs/red_ship.png', (600, 1000), 700, 2, random.randint(80, 100))
+    starship_red.scale(GLOBAL_SCALE)
+    game["p1_troops"].append(starship_red)
 
-command_center = draw.Building('imgs/command_center.png', (100, 100), 2000)
-command_center.scale((.5, .5))
-game["p1_buildings"].append(command_center)
+    command_center = draw.Building('imgs/command_center.png', (100, 100), 2000)
+    command_center.scale((.5, .5))
+    game["p1_buildings"].append(command_center)
 
-red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 150, 10, int(40-50))
-red_troop.scale(GLOBAL_SCALE)
-game["p1_troops"].append(red_troop)
+    red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 150, 10, int(40-50))
+    red_troop.scale(GLOBAL_SCALE)
+    game["p1_troops"].append(red_troop)
 
-blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
-blue_troop.scale(GLOBAL_SCALE)
-game["p1_troops"].append(blue_troop)
+    blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
+    blue_troop.scale(GLOBAL_SCALE)
+    game["p2_troops"].append(blue_troop)
 
-# print(parse_data(game_to_data()))
+    print(parse_data(game_to_data()))
 
-draw.main(game, "p1")
+    draw.main(game, "p1")
+
+if __name__ == "__main__":
+    main()
