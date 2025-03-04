@@ -362,7 +362,6 @@ def main(game: dict, player: str):
     buildings = game[f"{player}_buildings"]
     global enemy_buildings
     enemy_buildings = game[f"{other_player}_buildings"]
-    buildings = []
     global rallys
     rallys = []
 
@@ -520,6 +519,3 @@ def main(game: dict, player: str):
 
         pygame.display.update()
         clock.tick(60)
-
-if __name__ == "__main__":
-    main()

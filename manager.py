@@ -79,26 +79,6 @@ game: dict[str, list[draw.GameObject]] = {"p1_troops": [], "p2_troops": [], "p1_
 GLOBAL_SCALE = (.25, .25)
 
 def main():
-    # Load game objects
-    starship_grey = draw.Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
-    starship_grey.scale(GLOBAL_SCALE)
-    game["p1_troops"].append(starship_grey)
-
-    starship_red = draw.Troop('imgs/red_ship.png', (600, 1000), 700, 2, random.randint(80, 100))
-    starship_red.scale(GLOBAL_SCALE)
-    game["p1_troops"].append(starship_red)
-
-    command_center = draw.Building('imgs/command_center.png', (100, 100), 2000)
-    command_center.scale((.5, .5))
-    game["p1_buildings"].append(command_center)
-
-    red_troop = draw.Troop('imgs/red_soildger.png', (1200, 700), 150, 10, int(40-50))
-    red_troop.scale(GLOBAL_SCALE)
-    game["p1_troops"].append(red_troop)
-
-    blue_troop = draw.Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
-    blue_troop.scale(GLOBAL_SCALE)
-    game["p2_troops"].append(blue_troop)
 
     print(parse_data(game_to_data()))
 
