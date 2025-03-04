@@ -62,7 +62,7 @@ class Building(GameObject):
         super().__init__(sprite, position)
         self.max_health = max_health
         self.health = max_health
-        self.indicator = None
+        self.rally = None
 
 class Troop(GameObject):
     def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, sight_range: int = 250, shot_cooldown: int = 1):
@@ -83,10 +83,11 @@ class Troop(GameObject):
         self.velocity = Vector2(0, 0)
 
     def move(self, camera, screen):
+    # Enemy targeting
         if self.enemy_target:
-            distance_to_target = (self.position - self.enemy_target.position).length
+            distance_to_enemy = (self.position - self.enemy_target.position).length
 
-            if distance_to_target <= self.sight_range:
+            if distance_to_enemy <= self.sight_range:
                 if time.time() - self.time_since_shot > self.shot_cooldown:
                     self.projectile()
                     self.time_since_shot = time.time()
@@ -105,15 +106,22 @@ class Troop(GameObject):
                 self.enemy_target = None
 
         if self.target:
-            distance_to_target = (self.position - self.target).length
+            if isinstance(self.target, Building):
+                target_position = self.target.position
+            else:
+                target_position = self.target
+
+            distance_to_target = (self.position - target_position).length
             if distance_to_target <= self.speed:
                 self.stop()
             else:
-                self.goto(self.target)
+                self.goto(target_position)
 
+            # Update the troop's position
             self.position.x += self.velocity.x
             self.position.y += self.velocity.y
             self.rect.topleft = (self.position.x, self.position.y)
+
 
     def goto(self, position: Vector2):
         direction = Vector2(position.x - self.position.x, position.y - self.position.y)
@@ -281,6 +289,16 @@ def starport_troop_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: l
             return starport
     return None
 
+def command_center_spawn(mouse_pos: tuple, camera: Vector2, building_barracks: list[Building]) -> Building | None:
+    cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
+    for command in building_barracks:
+        if command.rect.collidepoint(cam_offset.x, cam_offset.y):
+            bgreen = Indicator('imgs/green.png')
+            bgreen.scale((.15, .15))
+            bgreens.append(bgreen)
+            return command
+    return None
+
 def select_troop(mouse_pos: tuple, camera: Vector2, troops: list[Troop], troop: Troop = None) -> Troop:
     cam_offset = Vector2(mouse_pos[0] + camera.x, mouse_pos[1] + camera.y)
     for troop in troops:
@@ -320,6 +338,12 @@ def main(game: dict, player: str):
     ]
 
     other_player = "p2" if player == "p1" else "p1"
+    # Load game objects
+    starship_grey = Troop('imgs/black_ship.png', (600, 450), 700, 2, random.randint(80, 100))
+    starship_grey.scale(GLOBAL_SCALE)
+
+    blue_troop = Troop('imgs/blue_soildger.png', (300, 200), 150, 10, int(40-50))
+    blue_troop.scale(GLOBAL_SCALE)
 
     troop = None
     selected_building = None
@@ -338,6 +362,9 @@ def main(game: dict, player: str):
     buildings = game[f"{player}_buildings"]
     global enemy_buildings
     enemy_buildings = game[f"{other_player}_buildings"]
+    buildings = []
+    global rallys
+    rallys = []
 
     clock = pygame.time.Clock()
     while True:
@@ -354,6 +381,9 @@ def main(game: dict, player: str):
                 selected_building = barraks_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                selected_building = command_center_spawn(pygame.mouse.get_pos(), camera, buildings)
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 selected_building = depot_troop_spawn(pygame.mouse.get_pos(), camera, buildings)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -363,8 +393,15 @@ def main(game: dict, player: str):
                 troop = select_troop(pygame.mouse.get_pos(), camera, troops, troop)
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-                    cam_pos = get_camera_position(camera, world_size, screen_size)
+                cam_pos = get_camera_position(camera, world_size, screen_size)
+                if selected_building:
+                    rally = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos  # Update rally point for building
+                    flag = Building('imgs/rally.png', rally, 1)
+                    flag.scale((.2, .2))
+                    rallys.append(flag)
+                else:
                     troop.target = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
+
 
             keys = pygame.key.get_pressed()
 
@@ -388,11 +425,40 @@ def main(game: dict, player: str):
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 if isinstance(selected_building, Building):
-                    spawn_x = selected_building.rect.right + 20
+                    spawn_x = selected_building.rect.right + random.randint(10,40)
                     spawn_y = selected_building.rect.centery + random.randint(-80, 80)
-                    red_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, int(40-50))
-                    red_troop.scale(GLOBAL_SCALE)
-                    troops.append(red_troop)
+
+                    if selected_building.sprite == 'imgs/barracks.png':
+                        #if mineral_count == 50:
+                        if rally is not None:
+                            new_troop = Troop('imgs/red_soildger.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                            new_troop.scale(GLOBAL_SCALE)
+                            new_troop.target = rally
+                            troops.append(new_troop)
+
+                    elif selected_building.sprite == 'imgs/command_center.png':
+                        #if mineral_count == 50:
+                        if rally is not None:
+                            new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                            new_collector.scale((.12, .12))
+                            new_collector.target = rally
+                            troops.append(new_collector)
+
+                    elif selected_building.sprite == 'imgs/starport.png':
+                        #if mineral_count == 150:
+                        if rally is not None:
+                            new_ship = Troop('imgs/red_ship.png', (spawn_x, spawn_y), 700, 2, random.randint(80, 100))
+                            new_ship.scale(GLOBAL_SCALE)
+                            new_ship.target = rally
+                            troops.append(new_ship)
+
+                    elif selected_building.sprite == 'imgs/vehicle_depot.png':
+                        #if mineral_count == 300:
+                        if rally is not None:
+                            new_tank = Troop('imgs/red_tank.png', (spawn_x, spawn_y), 400, 4, random.randint(50, 70))
+                            new_tank.scale((.15, .15))
+                            new_tank.target = rally
+                            troops.append(new_tank)
 
             if event.type == pygame.KEYDOWN:
                 keys = pygame.key.get_pressed()
@@ -413,6 +479,9 @@ def main(game: dict, player: str):
                     depot = Building('imgs/vehicle_depot.png', (445, 450), 1250)
                     depot.scale((.3, .3))
                     buildings.append(depot)
+                    command_center = Building('imgs/command_center.png', (100, 100), 2000)
+                    command_center.scale((.5, .5))
+                    buildings.append(command_center)
 
         # Render background tiles
         for pos in background_tiles:
@@ -435,6 +504,9 @@ def main(game: dict, player: str):
         for bullet in bullets:
             bullet.move(camera, screen)
             bullet.render(camera, screen)
+
+        for rally in rallys:
+            flag.render(camera, screen)
 
         for bgreen in bgreens:
             if selected_building:
