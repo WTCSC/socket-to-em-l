@@ -1,8 +1,6 @@
 import draw
 import json
 import inspect
-import random
-
 
 class GameObjParser(json.JSONEncoder):
     def default(self, o):
@@ -15,17 +13,16 @@ class GameObjParser(json.JSONEncoder):
                 return "z"
 
 def parse_data(data: str):
-    print(data)
-    global game
-    parsed: dict[str, list[dict[str, str | dict]]] = json.loads(data)
-    game_objects = {}
-    for list_obj in parsed:
-        game_objects[list_obj] = []
-        for game_object in parsed.get(list_obj):
-            obj_class = str_to_obj[game_object["class"]]
-            attributes = {k: v for k, v in game_object["data"].items() if v != "z"}
-            game_objects[list_obj].append(data_to_obj(obj_class, attributes))
-    game = game_objects
+    try:
+        parsed: dict[str, list[dict[str, dict]]] = json.loads(data)
+        for list_obj in parsed:
+            game[list_obj].clear()
+            for game_object in parsed.get(list_obj):
+                obj_class = str_to_obj[game_object["class"]]
+                attributes = {k: v for k, v in game_object["data"].items() if v != "z"}
+                game[list_obj].append(data_to_obj(obj_class, attributes))
+    except json.decoder.JSONDecodeError:
+        return
 
 def data_to_obj(obj_class, data):
     for key in data:
@@ -53,6 +50,7 @@ def data_to_obj(obj_class, data):
     
 
 def game_to_data():
+    print(game, "to data")
     data: dict[str, list]= {}
     for obj_list in game:
         data[obj_list] = []
@@ -79,9 +77,6 @@ game: dict[str, list[draw.GameObject]] = {"p1_troops": [], "p2_troops": [], "p1_
 GLOBAL_SCALE = (.25, .25)
 
 def main():
-
-    print(parse_data(game_to_data()))
-
     draw.main(game, "p1")
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ try:
     draw_thread.start()
     while True:
         send_game()
-        sleep(1/20)
+        sleep(1/10)
 except KeyboardInterrupt:
     print("Ending game...")
 except Exception as e:
