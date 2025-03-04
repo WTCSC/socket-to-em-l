@@ -15,15 +15,16 @@ class GameObjParser(json.JSONEncoder):
                 return "z"
 
 def parse_data(data: str):
+    global game
     parsed: dict[str, list[dict[str, str | dict]]] = json.loads(data)
     game_objects = {}
-    for player in parsed:
-        game_objects[player] = []
-        for game_object in parsed.get(player):
+    for list_obj in parsed:
+        game_objects[list_obj] = []
+        for game_object in parsed.get(list_obj):
             obj_class = str_to_obj[game_object["class"]]
             attributes = {k: v for k, v in game_object["data"].items() if v != "z"}
-            game_objects[player].append(data_to_obj(obj_class, attributes))
-    return game_objects
+            game_objects[list_obj].append(data_to_obj(obj_class, attributes))
+    game = game_objects
 
 def data_to_obj(obj_class, data):
     for key in data:

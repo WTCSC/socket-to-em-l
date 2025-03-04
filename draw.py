@@ -3,6 +3,7 @@ import time
 import random
 from math import sqrt
 from sys import exit
+import play
 
 class Vector2:
     def __init__(self, x: float, y: float):
@@ -449,6 +450,7 @@ def main(game: dict, player: str):
             screen.blit(green.surf, (troop.rect.midbottom[0] - camera.x - green.rect.width // 2, troop.rect.midbottom[1] - camera.y))
 
         pygame.display.update()
+        play.send_game()
         clock.tick(60)
 
 if __name__ == "__main__":

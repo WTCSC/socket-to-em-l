@@ -88,18 +88,12 @@ class Server:
     
     # "Send" data to the server and broadcast the data to all clients
     def send(self, data: str):
-        manager.parse_data(data)
         self.broadcast(data)
     
     # Send data to all clients
     def broadcast(self, data: str):
         for client in self.clients:
             client[0].send(data.encode())
-
-    # Send data to all clients and the server
-    def broadcast_all(self, data: str):
-        manager.parse_data(data)
-        self.broadcast(data)
     
     # Close a single client
     def close_client(self, client: socket.socket):
