@@ -136,6 +136,228 @@ class Troop(GameObject):
         bullets.append(bullet)
         bullet.enemy_target = self.enemy_target
 
+class Collector(Troop):
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, 
+                 command_center: Building, mineral_target: Mineral, collect_duration=4, collection_amount=10, **kwargs):
+        super().__init__(sprite, position, max_health, speed, damage, **kwargs)
+        self.state = "to_mineral"      # Automatic state: head to the mineral.
+        self.manual_override = False   # When True, manual commands override the state machine.
+        self.manual_target = None      # Holds a manual target (e.g. a rally point).
+        self.timer = 0                 # Timer for the "collecting" state.
+        self.command_center = command_center  # Where the collector returns.
+        self.mineral_target = mineral_target  # The mineral to mine.
+        self.collect_duration = collect_duration  # Seconds to wait at the mineral.
+        self.collection_amount = collection_amount  # Amount collected each cycle.
+
+    def set_manual_target(self, target: Vector2):
+        """Manually command the collector to move to a new target (e.g. rally point or next to a building)."""
+        self.manual_override = True
+        self.manual_target = target
+        self.state = "manual"
+
+    def update(self):
+        # If manual override is active, use the manual target and ignore the automatic state machine.
+        if self.manual_override:
+            if self.manual_target:
+                self.target = self.manual_target
+                # Move toward manual target (update movement below).
+                if (self.position - self.manual_target).length < 5:
+                    # Arrived at manual destination; disable manual override.
+                    self.manual_override = False
+                    self.state = "idle"
+            # Skip automatic behavior.
+            return
+
+        # Automatic state machine:
+        if self.state == "to_mineral":
+            self.target = self.mineral_target.position
+            # When the collector reaches the mineral, switch state to "collecting".
+            if self.rect.colliderect(self.mineral_target.rect):
+                self.state = "collecting"
+                self.timer = time.time() + self.collect_duration
+                self.stop()
+        elif self.state == "collecting":
+            if time.time() >= self.timer:
+                # Collect resources:
+                self.mineral_target.crystal_limit -= self.collection_amount
+                if self.mineral_target.crystal_limit < 0:
+                    self.mineral_target.crystal_limit = 0
+                # Now return to command center.
+                self.state = "to_command"
+                self.target = self.command_center.position
+        elif self.state == "to_command":
+            self.target = self.command_center.position
+            if self.rect.colliderect(self.command_center.rect):
+                if self.mineral_target.crystal_limit > 0:
+                    # Resume mining if resource is still available.
+                    self.state = "to_mineral"
+                else:
+                    self.state = "idle"
+                    self.target = None
+
+        # Movement update (for automatic states).
+        if self.target:
+            self.goto(self.target)
+            self.position.x += self.velocity.x
+            self.position.y += self.velocity.y
+            self.rect.topleft = (self.position.x, self.position.y)
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, command_center: Building, mineral_target: Mineral, collect_duration=4, collection_amount=10, **kwargs):
+        super().__init__(sprite, position, max_health, speed, damage, **kwargs)
+        self.state = "to_mineral"      # Automatic state machine begins
+        self.manual_override = False   # Manual override flag (False by default)
+        self.timer = 0                 # Used to wait during "collecting" state.
+        self.command_center = command_center  # Where the collector returns.
+        self.mineral_target = mineral_target  # The mineral to mine.
+        self.collect_duration = collect_duration  # How many seconds to wait while "collecting"
+        self.collection_amount = collection_amount  # How much is collected each cycle
+
+    def set_manual_target(self, target: Vector2):
+        # Switch to manual override mode.
+        self.state = "manual"
+        self.manual_override = True
+        self.target = target
+
+    def update(self):
+        # If manual override is active, just move toward the manually set target.
+        if self.state == "manual":
+            if self.target:
+                self.goto(self.target)
+                self.position.x += self.velocity.x
+                self.position.y += self.velocity.y
+                self.rect.topleft = (self.position.x, self.position.y)
+            # Optionally, if you detect that the collector has reached its manual target,
+            # you can disable the override (for example, if the distance is less than a threshold).
+            if self.target and (self.position - self.target).length < 5:
+                self.state = "idle"
+                self.manual_override = False
+            return
+
+        # Automatic state machine:
+        if self.state == "to_mineral":
+            self.target = self.mineral_target.position
+            if self.rect.colliderect(self.mineral_target.rect):
+                self.state = "collecting"
+                self.timer = time.time() + self.collect_duration
+                self.stop()  # Stop moving once at the mineral
+
+        elif self.state == "collecting":
+            if time.time() >= self.timer:
+                # Collect resource and deduct from the mineral.
+                self.mineral_target.crystal_limit -= self.collection_amount
+                if self.mineral_target.crystal_limit < 0:
+                    self.mineral_target.crystal_limit = 0
+                self.state = "to_command"
+                self.target = self.command_center.position
+
+        elif self.state == "to_command":
+            if self.rect.colliderect(self.command_center.rect):
+                if self.mineral_target.crystal_limit > 0:
+                    self.state = "to_mineral"
+                else:
+                    self.state = "idle"
+                    self.target = None
+
+        # Update movement for automatic states.
+        if self.target:
+            self.goto(self.target)
+            self.position.x += self.velocity.x
+            self.position.y += self.velocity.y
+            self.rect.topleft = (self.position.x, self.position.y)
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, command_center: Building, mineral_target: Mineral, collect_duration=4, collection_amount=10, **kwargs):
+        super().__init__(sprite, position, max_health, speed, damage, **kwargs)
+        self.state = "to_mineral"      # Initial state: move to the mineral.
+        self.timer = 0                 # Used to wait during the "collecting" state.
+        self.command_center = command_center  # The building where the collector should return.
+        self.mineral_target = mineral_target  # The mineral it will mine.
+        self.collect_duration = collect_duration  # How long to wait at the mineral (seconds).
+        self.collection_amount = collection_amount  # How much resource is taken each cycle.
+
+    def update(self):
+        # State machine update; call this each frame (or each move update).
+        if self.state == "to_mineral":
+            # Set the target to the mineral’s position.
+            self.target = self.mineral_target.position
+            # If we have reached the mineral, switch state to "collecting".
+            if self.rect.colliderect(self.mineral_target.rect):
+                self.state = "collecting"
+                self.timer = time.time() + self.collect_duration
+                self.stop()
+        
+        elif self.state == "collecting":
+            # Wait until 4 seconds have passed.
+            if time.time() >= self.timer:
+                # Deduct the collected amount from the mineral.
+                self.mineral_target.crystal_limit -= self.collection_amount
+                if self.mineral_target.crystal_limit < 0:
+                    self.mineral_target.crystal_limit = 0
+                # Switch state: now return to the command center.
+                self.state = "to_command"
+                self.target = self.command_center.position
+        
+        elif self.state == "to_command":
+            # Move toward the command center.
+            if self.rect.colliderect(self.command_center.rect):
+                # Arrived at the command center.
+                if self.mineral_target.crystal_limit > 0:
+                    self.state = "to_mineral"
+                else:
+                    self.state = "idle"
+                    self.target = None
+
+        # Update movement based on the target.
+        if self.target:
+            self.goto(self.target)
+            self.position.x += self.velocity.x
+            self.position.y += self.velocity.y
+            self.rect.topleft = (self.position.x, self.position.y)
+    def __init__(self, sprite: str, position: tuple, max_health: int, speed: int, damage: int, command_center, mineral_target, collect_duration=5, collection_amount=10, **kwargs):
+        super().__init__(sprite, position, max_health, speed, damage, **kwargs)
+        self.state = "to_mineral"  # initial state: head to the mineral
+        self.timer = 0
+        self.command_center = command_center  # reference to command center GameObject
+        self.mineral_target = mineral_target  # reference to the Mineral GameObject
+        self.collect_duration = collect_duration  # wait time at the mineral (in seconds)
+        self.collection_amount = collection_amount  # amount collected per cycle
+
+    def update(self):
+        # This method is called every frame (or in your move() function)
+        if self.state == "to_mineral":
+            # Set target to mineral's position
+            self.target = self.mineral_target.position
+            # When the collector reaches the mineral, switch state
+            if self.rect.colliderect(self.mineral_target.rect):
+                self.state = "collecting"
+                self.timer = time.time() + self.collect_duration
+                self.stop()  # Stop moving
+
+        elif self.state == "collecting":
+            # Wait for the timer to finish
+            if time.time() >= self.timer:
+                # After collecting, deduct the collected amount from the mineral
+                self.mineral_target.crystal_limit -= self.collection_amount
+                if self.mineral_target.crystal_limit < 0:
+                    self.mineral_target.crystal_limit = 0
+                # Then set the state to return to command center
+                self.state = "to_command"
+                self.target = self.command_center.position
+
+        elif self.state == "to_command":
+            # Move toward command center
+            if self.rect.colliderect(self.command_center.rect):
+                # (Optionally, unload resources here)
+                # If the mineral still has resources, go back to collect more:
+                if self.mineral_target.crystal_limit > 0:
+                    self.state = "to_mineral"
+                else:
+                    self.state = "idle"  # or another state indicating no more resource
+
+        # Update movement based on the target (if any)
+        if self.target:
+            self.goto(self.target)
+            self.position.x += self.velocity.x
+            self.position.y += self.velocity.y
+            self.rect.topleft = (self.position.x, self.position.y)
+
 def get_camera_position(camera: Vector2, world_size: tuple, screen_size: tuple) -> Vector2:
     camera_x = max(0, min(camera.x, world_size[0] - screen_size[0]))
     camera_y = max(0, min(camera.y, world_size[1] - screen_size[1]))
@@ -167,6 +389,15 @@ def select_enemy_troop(mouse_pos: tuple, camera: Vector2, enemy_troops: list[Tro
         if enemy_troop.rect.collidepoint(cam_offset.x, cam_offset.y):
             return enemy_troop
     return None
+
+def check_collector_mineral_collisions(collectors: list[Troop], minerals: list[Mineral]) -> list[tuple[Troop, Mineral]]:
+    collisions = []
+    for collector in collectors:
+        if collector.sprite == 'imgs/collector.png':
+            for mineral in minerals:
+                if collector.rect.colliderect(mineral.rect):
+                    collisions.append((collector, mineral))
+    return collisions
 
 def main(game: dict, player: str):
     pygame.init()
@@ -261,9 +492,10 @@ def main(game: dict, player: str):
                     mineral_clicked = select_mineral(mouse_pos, camera, minerals)
                     if collector_selected and mineral_clicked:
                         for obj in selected_objects:
-                            if isinstance(obj, Troop) and obj.sprite == 'imgs/collector.png':
-                                obj.target = mineral_clicked.position
-                                break
+                            if isinstance(obj, Collector):
+                                obj.set_manual_target(move_target)
+                            elif isinstance(obj, Troop):
+                                obj.target = move_target
                     elif building_selected:
                         rally = Vector2(mouse_pos[0], mouse_pos[1]) + cam_pos
                         rallys.clear()
@@ -312,7 +544,8 @@ def main(game: dict, player: str):
                                 if rally is not None:
                                     if troop_limit <= 49 and mineral_count >= 50:
                                         mineral_count -= 50
-                                        new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                        mineral_target = minerals[0]
+                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral)
                                         new_collector.scale((.12, .12))
                                         new_collector.target = rally
                                         troop_limit += 1
@@ -322,7 +555,8 @@ def main(game: dict, player: str):
                                 else:
                                     if troop_limit <= 49 and mineral_count >= 50:
                                         mineral_count -= 50
-                                        new_collector = Troop('imgs/collector.png', (spawn_x, spawn_y), 150, 10, random.randint(30, 40))
+                                        mineral_target = minerals[0]
+                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral)
                                         new_collector.scale((.12, .12))
                                         troop_limit += 1
                                         troops.append(new_collector)
@@ -422,6 +656,8 @@ def main(game: dict, player: str):
             enemy.move(camera, screen)
             enemy.render(camera, screen)
         for troop in troops:
+            if isinstance(troop, Collector):
+                troop.update()
             troop.move(camera, screen)
             troop.render(camera, screen)
         for bullet in bullets:
