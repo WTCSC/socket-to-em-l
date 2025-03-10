@@ -17,7 +17,7 @@ def prompt(text = "", options = [], error = ""):
 
 def send_game():
     # print(manager.game_to_data())
-    player.send(manager.game_to_data())
+    player.send(manager.game_to_data(player_number))
 
 print("Welcome to ____\n")
 
@@ -31,17 +31,17 @@ else:
     ip = input()
     player = connector.connect(ip)
 
+player_number = "p1" if is_hosting else "p2"
+
 try:
-    # draw_thread = Thread(target=draw.main, args=[manager.game, "p1" if is_hosting else "p2"])
-    draw_thread = Thread(target=manager.main)
+    draw_thread = Thread(target=draw.main, args=[manager.game, player_number])
+    # draw_thread = Thread(target=manager.main)
     draw_thread.start()
     while True:
         send_game()
         sleep(1/10)
 except KeyboardInterrupt:
     print("Ending game...")
-except Exception as e:
-    print(f"Error: {e}")
 finally:
     player.close()
     print("Disconnected")

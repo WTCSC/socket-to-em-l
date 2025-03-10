@@ -32,7 +32,7 @@ class Vector2:
     __rmul__ = __mul__
 
 class GameObject:
-    def __init__(self, sprite: str, position: tuple | Vector2, owner: int = 0):
+    def __init__(self, sprite: str, position: tuple | Vector2, owner: int = 0, size: Vector2 | None = None):
         self.sprite = sprite
         if isinstance(position, tuple):
             self.position = Vector2(position[0], position[1])
@@ -41,6 +41,10 @@ class GameObject:
         self.owner = owner
         self.surf = pygame.image.load(self.sprite)
         self.rect = self.surf.get_rect(topleft=tuple(self.position))
+        if size is not None:
+            self.size = size
+        else:
+            self.size = Vector2(*self.rect.size)
     
     def render(self, camera, screen):
         screen.blit(self.surf, (self.rect.x - camera.x, self.rect.y - camera.y))
@@ -50,11 +54,13 @@ class GameObject:
             self.surf, 
             (int(self.rect.width * factor[0]), int(self.rect.height * factor[1]))
         )
-        self.rect.size = (self.surf.get_width(), self.surf.get_height())
+        self.size = Vector2(self.surf.get_width(), self.surf.get_height())
+        self.rect.size = tuple(self.size)
 
-    def size(self, size: tuple):
+    def resize(self, size: tuple):
         self.surf = pygame.transform.scale(self.surf, size)
-        self.rect.size = (self.surf.get_width(), self.surf.get_height())
+        self.size = Vector2(self.surf.get_width(), self.surf.get_height())
+        self.rect.size = tuple(self.size)
 
 class Indicator(GameObject):
     def __init__(self, sprite: str, position: tuple = (0, 0)):
@@ -408,7 +414,7 @@ def main(game: dict, player: str):
     camera_speed = 30
 
     background = GameObject('imgs/background_grid.png', (0, 0))
-    background.size((3000, 2000))
+    background.resize((3000, 2000))
     background_tiles = [(0, 0), (3000, 0), (0, 2000), (3000, 2000)]
 
     other_player = "p2" if player == "p1" else "p1"
@@ -449,7 +455,8 @@ def main(game: dict, player: str):
     global selected_objects, troops, enemy_troops, bullets, buildings, enemy_buildings, rallys, minerals
     troops = game[f"{player}_troops"]
     enemy_troops = game[f"{other_player}_troops"]
-    bullets = game["bullets"]
+    bullets = game[f"{player}_bullets"]
+    enemy_bullets = game[f"{other_player}_bullets"]
     buildings = game[f"{player}_buildings"]
     enemy_buildings = game[f"{other_player}_buildings"]
     rallys = []
@@ -545,7 +552,7 @@ def main(game: dict, player: str):
                                     if troop_limit <= 49 and mineral_count >= 50:
                                         mineral_count -= 50
                                         mineral_target = minerals[0]
-                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral)
+                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral) # type: ignore
                                         new_collector.scale((.12, .12))
                                         new_collector.target = rally
                                         troop_limit += 1
@@ -556,7 +563,7 @@ def main(game: dict, player: str):
                                     if troop_limit <= 49 and mineral_count >= 50:
                                         mineral_count -= 50
                                         mineral_target = minerals[0]
-                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral)
+                                        new_collector = Collector('imgs/collector.png', (spawn_x, spawn_y), 150, 5, random.randint(30, 40), command_center, clicked_mineral) # type: ignore
                                         new_collector.scale((.12, .12))
                                         troop_limit += 1
                                         troops.append(new_collector)
@@ -660,7 +667,7 @@ def main(game: dict, player: str):
                 troop.update()
             troop.move(camera, screen)
             troop.render(camera, screen)
-        for bullet in bullets:
+        for bullet in bullets + enemy_bullets:
             bullet.move(camera, screen)
             bullet.render(camera, screen)
         for flag in rallys:
@@ -677,7 +684,8 @@ if __name__ == "__main__":
     game = {
         "p1_troops": [],
         "p2_troops": [],
-        "bullets": [],
+        "p1_bullets": [],
+        "p2_bullets": [],
         "p1_buildings": [],
         "p2_buildings": []
     }
