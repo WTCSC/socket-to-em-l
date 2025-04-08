@@ -461,7 +461,7 @@ def apply_game_snapshot(game, snapshot):
 # =======================
 pygame.init()
 # Using windowed mode for easier debugging; you can change to FULLSCREEN if desired.
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
 pygame.display.set_caption("RTS Multiplayer")
 clock = pygame.time.Clock()
 
