@@ -4,7 +4,7 @@ import random
 import math
 import socket
 import threading
-import pickle  # used for event serialization
+import pickle  # used for serializing network events
 from pygame.locals import *
 
 # =======================
@@ -16,54 +16,50 @@ CAMERA_BORDER = 20       # When mouse is near the edge, pan camera
 CAMERA_SPEED = 300       # Pixels per second
 
 # Costs (all in minerals)
-COST_BARRACKS = 150       
-COST_SCV = 50             
-COST_MARINE = 50          
-COST_TANK = 150           
-COST_WRAITH = 200         
-COST_TANK_FACTORY = 300   
-COST_WRAITH_FACTORY = 350 
-COST_TURRET = 200         
-COST_BUNKER = 250         
+COST_BARRACKS      = 150       
+COST_SCV           = 50             
+COST_MARINE        = 50          
+COST_TANK          = 150           
+COST_WRAITH        = 200         
+COST_TANK_FACTORY  = 300   
+COST_WRAITH_FACTORY= 350 
+COST_TURRET        = 200         
+COST_BUNKER        = 250         
 
-# Mining settings
-MINING_CYCLE = 4          # Seconds per mining cycle
-MINING_YIELD = 8          # Minerals per cycle
+# Mining and production settings
+MINING_CYCLE   = 4          # Seconds per mining cycle
+MINING_YIELD   = 8          # Minerals per cycle
 MINERAL_AMOUNT = 1500     
-
-# Production settings
 PRODUCTION_TIME = 8.0     # Seconds per unit spawn
-MAX_QUEUE = 5             
+MAX_QUEUE       = 5             
 
-# Combat settings
+# Combat settings (not fully implemented here)
 MARINE_SHOOT_COOLDOWN = 0.5   
-PROJECTILE_SPEED = 300        
-PROJECTILE_DAMAGE = 15        
-SCV_ATTACK_DAMAGE = 5         
+PROJECTILE_SPEED      = 300        
+PROJECTILE_DAMAGE     = 15        
+SCV_ATTACK_DAMAGE     = 5         
 
 # Engagement & separation settings
-ENGAGEMENT_RADIUS = 100       
+ENGAGEMENT_RADIUS  = 100       
 SEPARATION_DISTANCE = 15      
-SEPARATION_FORCE = 20         
+SEPARATION_FORCE    = 20         
 
-# Turret settings
-TURRET_SHOOT_INTERVAL = 1.0   
-TURRET_PROJECTILE_SPEED = 400 
+# Turret and bunker settings
+TURRET_SHOOT_INTERVAL    = 1.0   
+TURRET_PROJECTILE_SPEED  = 400 
 TURRET_PROJECTILE_DAMAGE = 10  
-TURRET_RANGE = 150             
-
-# Bunker settings
-BUNKER_SHOOT_INTERVAL = 3.0   
-BUNKER_PROJECTILE_SPEED = 250 
+TURRET_RANGE             = 150             
+BUNKER_SHOOT_INTERVAL    = 3.0   
+BUNKER_PROJECTILE_SPEED  = 250 
 BUNKER_PROJECTILE_DAMAGE = 25 
-BUNKER_RANGE = 100             
-BUNKER_MAX_HEALTH = 1200       
+BUNKER_RANGE             = 100             
+BUNKER_MAX_HEALTH        = 1200       
 
 # Upgrade system
 UPGRADE_COST = 100            
 player_damage_multiplier = 1.0  
 
-# Snapshot interval (in seconds) for host to send game state
+# Host state snapshot interval in seconds
 SNAPSHOT_INTERVAL = 10.0
 
 # =======================
@@ -80,13 +76,13 @@ def get_next_id():
 #    NETWORKING SETUP
 # =======================
 network_mode = None   # "host" or "client"
-network_socket = None # For host, this is the accepted connection; for client, it is the socket connected to host.
-incoming_events = []  # List of events received from remote
+network_socket = None # Host: accepted connection; Client: connection socket.
+incoming_events = []  # Will store network events
 
-net_lock = threading.Lock()  # lock for incoming_events
+net_lock = threading.Lock()
 
 def network_send(event):
-    """Send a serialized event over the network."""
+    """Send a network event, serialized with pickle."""
     global network_socket
     try:
         data = pickle.dumps(event)
@@ -96,7 +92,7 @@ def network_send(event):
         print("Network send error:", e)
 
 def recvall(conn, n):
-    """Helper function: receive n bytes or return None."""
+    """Helper function: receive n bytes from the socket or return None."""
     data = b''
     while len(data) < n:
         packet = conn.recv(n - len(data))
@@ -106,12 +102,13 @@ def recvall(conn, n):
     return data
 
 def network_receive_thread(conn):
-    """Background thread that receives network events."""
+    """Thread to constantly receive network events."""
     global incoming_events
     while True:
         try:
             raw_len = recvall(conn, 4)
             if not raw_len:
+                print("Network connection closed.")
                 break
             msg_len = int.from_bytes(raw_len, byteorder='big')
             data = recvall(conn, msg_len)
@@ -127,30 +124,36 @@ def network_receive_thread(conn):
 def init_network():
     """Initialize network connection based on user input."""
     global network_mode, network_socket
+    print("Select network mode:")
+    print("   host   - start a server and wait for connection")
+    print("   client - connect to a host (requires IP address)")
     mode = input("Enter network mode (host/client): ").strip().lower()
     if mode == "host":
         network_mode = "host"
-        host_ip = ''  # bind on all interfaces
+        host_ip = ''  # Listen on all interfaces
         port = 9999
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind((host_ip, port))
-        server.listen(1)
-        print("Waiting for a connection on port", port, "...")
-        network_socket, addr = server.accept()
-        print("Client connected from", addr)
-        threading.Thread(target=network_receive_thread, args=(network_socket,), daemon=True).start()
+        try:
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server.bind((host_ip, port))
+            server.listen(1)
+            print("Hosting game... waiting for connection on port", port)
+            network_socket, addr = server.accept()
+            print("Client connected from:", addr)
+        except Exception as e:
+            print("Error initializing host:", e)
+            sys.exit()
     else:
         network_mode = "client"
         host_address = input("Enter host IP: ").strip()
         port = 9999
-        network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             network_socket.connect((host_address, port))
+            print("Connected to host at", host_address)
         except Exception as e:
             print("Connection error:", e)
             sys.exit()
-        print("Connected to host", host_address)
-        threading.Thread(target=network_receive_thread, args=(network_socket,), daemon=True).start()
+    threading.Thread(target=network_receive_thread, args=(network_socket,), daemon=True).start()
 
 # =======================
 #    GAME CLASSES
@@ -182,7 +185,7 @@ class Building:
             self.max_health = 1000
         self.progress = 100 if complete else 0
         self.complete = complete
-        self.builder = None  # SCV constructing the building
+        self.builder = None  # The SCV currently constructing
         if b_type in ["Command Center", "Barracks", "Tank Factory", "Wraith Factory", "Bunker"]:
             self.production_queue = []
             self.production_timer = 0.0
@@ -218,9 +221,9 @@ class Unit:
         self.y = y
         self.owner = owner  # "player1" or "player2"
         self.health = 50
-        self.move_target = None  # Destination (x, y)
+        self.move_target = None   # (x, y)
         if u_type == "SCV":
-            self.state = "idle"  # states: idle, to_mineral, mining, to_depot, building, repairing, moving, attack_move, attacking, retreat
+            self.state = "idle"   # Possible states: idle, to_mineral, mining, to_depot, building, repairing, moving, etc.
             self.mine_timer = 0
             self.target_mineral = None
             self.deposit_target = None
@@ -248,7 +251,7 @@ class Projectile:
     def __init__(self, x, y, target, speed, damage, owner):
         self.x = x
         self.y = y
-        self.target = target  # must have x, y, health
+        self.target = target  # Should have x, y, and health attributes
         self.speed = speed
         self.damage = damage
         self.owner = owner
@@ -291,13 +294,13 @@ class Game:
         self.buildings = []
         self.units = []
         self.projectiles = []
-        # Separate resource pools for the two players:
+        # Resources for both players:
         self.resources = {"player1": 50, "player2": 50}
         self.game_over = False
         self.winner = None
         self.player1_minerals = []
         self.player2_minerals = []
-        self.resource_drops = []   # Extra mineral drops
+        self.resource_drops = []  # Extra mineral drops
         self.elapsed_time = 0
 
     def count_units(self, owner, unit_type):
@@ -337,7 +340,7 @@ class Game:
                 return False
             self.resources[building.owner] -= cost
             building.production_queue.append(unit_type)
-            print(f"Queued {unit_type} at {building.type} for {building.owner} (Queue: {len(building.production_queue)})")
+            print(f"Queued {unit_type} at {building.type} for {building.owner}.")
             return True
         else:
             print("Production queue is full!")
@@ -433,7 +436,7 @@ class Game:
         return None
 
 def get_game_snapshot(game):
-    """Create a simplified snapshot of game state for resynchronization."""
+    """Create a minimal snapshot of game state for resynchronization."""
     snapshot = {
         "buildings": [{"uid": b.uid, "type": b.type, "x": b.x, "y": b.y, "owner": b.owner,
                         "health": b.health, "complete": b.complete, "progress": b.progress} for b in game.buildings],
@@ -444,26 +447,24 @@ def get_game_snapshot(game):
     return snapshot
 
 def apply_game_snapshot(game, snapshot):
-    """Update local game state with a snapshot (simplified example)."""
-    # For demonstration, we replace resources and print snapshot info.
+    """Update local game state with a snapshot (here we simply update resources)."""
     game.resources = snapshot.get("resources", game.resources)
-    # In a full implementation, you would reconcile the full lists of units and buildings.
     print("State snapshot applied.")
 
 # =======================
 #   STARTING SCREEN
 # =======================
 def starting_screen():
-    """Display a starting screen with instructions on how to start."""
+    """Display instructions on screen before starting the game."""
     screen.fill((0, 0, 0))
     font_title = pygame.font.SysFont(None, 72)
     font_instr = pygame.font.SysFont(None, 36)
     title_text = font_title.render("RTS Multiplayer", True, (255, 255, 255))
     instr_lines = [
         "Press ENTER to start the game.",
-        "In the terminal, you'll be prompted for network mode.",
-        "Host: Wait for client connection.",
-        "Client: Enter host IP address."
+        "Follow terminal prompts for network mode:",
+        "  HOST: Wait for a connection.",
+        "  CLIENT: Enter the host IP address."
     ]
     y = SCREEN_HEIGHT // 3
     screen.blit(title_text, (SCREEN_WIDTH//2 - title_text.get_width()//2, y))
@@ -476,7 +477,7 @@ def starting_screen():
     waiting = True
     while waiting:
         for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+            if event.type == KEYDOWN and event.key == pygame.K_RETURN:
                 waiting = False
             elif event.type == QUIT:
                 pygame.quit()
@@ -493,14 +494,14 @@ def draw_controls(surface):
     controls = [
         "Controls:",
         "Left Click: Select / Place buildings",
-        "Right Click: Issue move, mine, repair, or attack commands",
-        "P: Enter Build Mode, then press:",
+        "Right Click: Move command for SCVs and troops",
+        "P: Build mode. Then press:",
         "   B - Barracks, F - Tank Factory, W - Wraith Factory, T - Turret, N - Bunker",
-        "S: Queue production order for selected production building",
-        "A: Attack command (not fully implemented)",
+        "S: Queue production order for selected building",
         "R: Repair command (with SCV selected)",
         "X: Upgrade weapon damage (cost 100 minerals)",
-        "C: Hold to view controls"
+        "A: Attack command (target location)",
+        "C: Hold to view this help overlay"
     ]
     for i, line in enumerate(controls):
         text = font.render(line, True, (255,255,255))
@@ -518,20 +519,22 @@ clock = pygame.time.Clock()
 # Show starting screen instructions
 starting_screen()
 
-# Initialize networking now
+# Initialize networking (this will prompt in the terminal)
 init_network()
 
 cam_offset = [0, 0]
 waiting_for_build_key = False
-build_mode = None   # Options: "Barracks", "Tank Factory", "Wraith Factory", "Turret", "Bunker"
+build_mode = None   # Options: Barracks, Tank Factory, Wraith Factory, Turret, Bunker
 builder_unit = None
 
-# Create game instance and initial state for both players.
+# Create game instance.
 game = Game()
+# Set up Command Centers and mineral fields for both players.
 p1_cc = game.add_building("Command Center", 300, 300, "player1", complete=True)
 p2_cc = game.add_building("Command Center", 1700, 1700, "player2", complete=True)
 game.player1_minerals = generate_minerals_cshape((p1_cc.x, p1_cc.y))
 game.player2_minerals = generate_minerals_cshape((p2_cc.x, p2_cc.y))
+# Add starting SCVs.
 for i in range(4):
     scv = game.add_unit("SCV", p1_cc.x + 20 + i * 15, p1_cc.y + 20, "player1")
     scv.state = "idle"
@@ -547,16 +550,19 @@ selection_rect = pygame.Rect(0, 0, 0, 0)
 selected_units = []
 attack_command_active = False
 
-snapshot_timer = 0.0  # For host to send state snapshots
+snapshot_timer = 0.0  # For host to send periodic snapshots
 
 # =======================
 #       MAIN LOOP
 # =======================
 running = True
-game_time = 0  # overall game timer in seconds
+game_time = 0  # overall game time in seconds
+
 while running:
     dt = clock.tick(60) / 1000.0
     game_time += dt
+
+    # Host sends state snapshots periodically.
     if network_mode == "host":
         snapshot_timer += dt
         if snapshot_timer >= SNAPSHOT_INTERVAL:
@@ -564,6 +570,7 @@ while running:
             network_send({"action": "state_snapshot", "snapshot": snap})
             snapshot_timer = 0.0
 
+    # Update camera based on mouse position.
     mx, my = pygame.mouse.get_pos()
     if mx < CAMERA_BORDER:
         cam_offset[0] = max(0, cam_offset[0] - CAMERA_SPEED * dt)
@@ -574,7 +581,7 @@ while running:
     if my > SCREEN_HEIGHT - CAMERA_BORDER:
         cam_offset[1] = min(WORLD_HEIGHT - SCREEN_HEIGHT, cam_offset[1] + CAMERA_SPEED * dt)
     
-    # Process events and also network events.
+    # Process local input events.
     for event in pygame.event.get():
         if event.type == QUIT:
             running = False
@@ -615,7 +622,7 @@ while running:
                     build_mode = None
                 else:
                     game.resources[owner] -= cost
-                    print(f"{build_mode} build mode activated. A green preview box will appear.")
+                    print(f"{build_mode} build mode activated. A green preview will appear.")
             if event.key == K_r:
                 for unit in selected_units:
                     if unit.type == "SCV":
@@ -657,7 +664,7 @@ while running:
                             else:
                                 continue
                             obj.production_queue.append(unit_type)
-                            print(f"Queued {unit_type} at {obj.type} (Queue: {len(obj.production_queue)})")
+                            print(f"Queued {unit_type} at {obj.type}.")
                             network_send({"action": "queue_production", "building_id": obj.uid, "unit": unit_type})
             if event.key == K_x:
                 owner = selected_units[0].owner if selected_units else ("player1" if network_mode=="host" else "player2")
@@ -674,7 +681,7 @@ while running:
         if event.type == MOUSEBUTTONDOWN:
             wx = event.pos[0] + cam_offset[0]
             wy = event.pos[1] + cam_offset[1]
-            if event.button == 3:  # Right-click: move command.
+            if event.button == 3:  # Right-click: Move command.
                 if selected_units:
                     for u in selected_units:
                         if u.state not in ["building", "repairing"]:
@@ -682,13 +689,13 @@ while running:
                             u.move_target = (wx, wy)
                     print("Units moving to", (wx, wy))
                     network_send({"action": "move", "units": [u.uid for u in selected_units], "target": (wx, wy)})
-            if event.button == 1:  # Left-click
+            if event.button == 1:  # Left-click.
                 if build_mode is not None and builder_unit:
                     new_b = game.add_building(build_mode, wx, wy, builder_unit.owner, complete=False)
                     new_b.builder = builder_unit
                     builder_unit.state = "building"
                     builder_unit.target_building = new_b
-                    print(f"{builder_unit.owner} {build_mode} placed at ({wx}, {wy}).")
+                    print(f"{builder_unit.owner} placed {build_mode} at ({wx}, {wy}).")
                     build_mode = None
                     selected_units = []
                     network_send({"action": "build", "building_type": new_b.type, "pos": (wx, wy), "owner": builder_unit.owner})
@@ -746,26 +753,33 @@ while running:
             if net_ev.get("action") == "state_snapshot":
                 if network_mode == "client":
                     apply_game_snapshot(game, net_ev.get("snapshot", {}))
-            # Other network events could be processed here to update positions, spawn units, etc.
+            # Additional event types could be handled here to update the local state.
     
-    # Update game logic.
+    # Update game simulation.
     game.update(dt)
     
-    # Drawing.
+    # Draw the game world.
     screen.fill((0, 0, 0))
     for x in range(0, WORLD_WIDTH, 100):
-        pygame.draw.line(screen, (20,20,20), (x - cam_offset[0], 0 - cam_offset[1]), (x - cam_offset[0], WORLD_HEIGHT - cam_offset[1]))
+        pygame.draw.line(screen, (20,20,20),
+                         (x - cam_offset[0], 0 - cam_offset[1]),
+                         (x - cam_offset[0], WORLD_HEIGHT - cam_offset[1]))
     for y in range(0, WORLD_HEIGHT, 100):
-        pygame.draw.line(screen, (20,20,20), (0 - cam_offset[0], y - cam_offset[1]), (WORLD_WIDTH - cam_offset[0], y - cam_offset[1]))
-    # Draw minerals.
+        pygame.draw.line(screen, (20,20,20),
+                         (0 - cam_offset[0], y - cam_offset[1]),
+                         (WORLD_WIDTH - cam_offset[0], y - cam_offset[1]))
+    # Draw minerals for both players.
     for m in game.player1_minerals:
         if m.amount > 0:
-            pygame.draw.circle(screen, (255,255,0), (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
+            pygame.draw.circle(screen, (255,255,0),
+                               (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
     for m in game.player2_minerals:
         if m.amount > 0:
-            pygame.draw.circle(screen, (200,200,0), (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
+            pygame.draw.circle(screen, (200,200,0),
+                               (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
     for drop in game.resource_drops:
-        pygame.draw.circle(screen, (0,255,0), (int(drop.x - cam_offset[0]), int(drop.y - cam_offset[1])), 6)
+        pygame.draw.circle(screen, (0,255,0),
+                           (int(drop.x - cam_offset[0]), int(drop.y - cam_offset[1])), 6)
     # Draw buildings.
     for b in game.buildings:
         if b.type == "Command Center":
@@ -782,6 +796,7 @@ while running:
             col = (100,100,100)
         rect = pygame.Rect(b.x - 15 - cam_offset[0], b.y - 15 - cam_offset[1], 30, 30)
         pygame.draw.rect(screen, col, rect)
+        # Draw health bar.
         bar_w, bar_h = 30, 4
         ratio = b.health / b.max_health
         pygame.draw.rect(screen, (255,0,0), (rect.left, rect.top-6, bar_w, bar_h))
@@ -815,6 +830,7 @@ while running:
             rect_unit = pygame.Rect(pos[0]-10, pos[1]-5, 20, 10)
             pygame.draw.ellipse(screen, (218,165,32), rect_unit)
             pygame.draw.line(screen, (0,0,0), (pos[0]+5, pos[1]), (pos[0]+15, pos[1]), 3)
+        # Draw unit health bar.
         bw, bh = 20, 3
         ratio = u.health / 50
         pygame.draw.rect(screen, (255,0,0), (pos[0]-10, pos[1]-15, bw, bh))
@@ -825,8 +841,9 @@ while running:
         ppos = (int(p.x - cam_offset[0]), int(p.y - cam_offset[1]))
         pygame.draw.circle(screen, (255,255,0), ppos, 4)
     if selecting:
-        s_rect = pygame.Rect(selection_rect.left - cam_offset[0], selection_rect.top - cam_offset[1],
-                               selection_rect.width, selection_rect.height)
+        s_rect = pygame.Rect(selection_rect.left - cam_offset[0],
+                             selection_rect.top - cam_offset[1],
+                             selection_rect.width, selection_rect.height)
         pygame.draw.rect(screen, (0,255,0), s_rect, 1)
     if build_mode is not None and builder_unit:
         mx2, my2 = pygame.mouse.get_pos()
@@ -853,17 +870,17 @@ while running:
     screen.blit(res_text, (10, 10))
     selected_counts = {"M":0, "S":0, "T":0, "W":0}
     for u in selected_units:
-        if hasattr(u, "type"):
-            if u.type == "Marine":
-                selected_counts["M"] += 1
-            elif u.type == "SCV":
-                selected_counts["S"] += 1
-            elif u.type == "Tank":
-                selected_counts["T"] += 1
-            elif u.type == "Wraith":
-                selected_counts["W"] += 1
-    troop_text = font.render(f"(Selected Troops: {selected_counts['M']}M {selected_counts['S']}S {selected_counts['T']}T {selected_counts['W']}W)", True, (255,255,255))
+        if u.type == "Marine":
+            selected_counts["M"] += 1
+        elif u.type == "SCV":
+            selected_counts["S"] += 1
+        elif u.type == "Tank":
+            selected_counts["T"] += 1
+        elif u.type == "Wraith":
+            selected_counts["W"] += 1
+    troop_text = font.render(f"(Troops: {selected_counts['M']}M {selected_counts['S']}S {selected_counts['T']}T {selected_counts['W']}W)", True, (255,255,255))
     screen.blit(troop_text, (10, 50))
+    # Draw a mini-map.
     mini_w, mini_h = 100, 100
     minimap = pygame.Surface((mini_w, mini_h))
     minimap.fill((50,50,50))
@@ -872,7 +889,7 @@ while running:
     for b in game.buildings:
         bx = int(b.x * scale_x)
         by = int(b.y * scale_y)
-        col = (0,255,0) if b.owner==("player1" if network_mode=="host" else "player2") else (255,0,0)
+        col = (0,255,0) if b.owner == ("player1" if network_mode=="host" else "player2") else (255,0,0)
         pygame.draw.rect(minimap, col, (bx, by, 3, 3))
     for u in game.units:
         ux = int(u.x * scale_x)
