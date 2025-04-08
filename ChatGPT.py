@@ -122,13 +122,15 @@ def network_receive_thread(conn):
             break
 
 def init_network():
-    """Initialize network connection based on user input."""
+    """Initialize network connection automatically.
+       - In host mode, wait for a connection.
+       - In client mode, automatically connect to 10.103.1.51.
+    """
     global network_mode, network_socket
-    print("Select network mode:")
-    print("   host   - start a server and wait for connection")
-    print("   client - connect to a host (requires IP address)")
-    mode = input("Enter network mode (host/client): ").strip().lower()
-    if mode == "host":
+    # Here we use a command line argument or default; for simplicity,
+    # you can edit the following variable manually:
+    MODE = input("Enter network mode (host/client): ").strip().lower()
+    if MODE == "host":
         network_mode = "host"
         host_ip = ''  # Listen on all interfaces
         port = 9999
@@ -144,15 +146,28 @@ def init_network():
             sys.exit()
     else:
         network_mode = "client"
-        host_address = input("Enter host IP: ").strip()
+        # Automatically set host address to 10.103.1.51
+        host_address = "10.103.1.51"
         port = 9999
-        try:
-            network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            network_socket.connect((host_address, port))
-            print("Connected to host at", host_address)
-        except Exception as e:
-            print("Connection error:", e)
+        network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        network_socket.settimeout(10)  # timeout set to 10 seconds
+        attempt = 0
+        connected = False
+        while attempt < 3 and not connected:
+            try:
+                print(f"Attempting to connect to {host_address}:{port} (Attempt {attempt+1})...")
+                network_socket.connect((host_address, port))
+                connected = True
+            except Exception as e:
+                print("Connection error:", e)
+                attempt += 1
+                if attempt < 3:
+                    print("Retrying...")
+        if not connected:
+            print("Failed to connect after several attempts. Please check your network settings.")
             sys.exit()
+        print("Connected to host at", host_address)
+    # Start the receiver thread
     threading.Thread(target=network_receive_thread, args=(network_socket,), daemon=True).start()
 
 # =======================
@@ -185,7 +200,7 @@ class Building:
             self.max_health = 1000
         self.progress = 100 if complete else 0
         self.complete = complete
-        self.builder = None  # The SCV currently constructing
+        self.builder = None  # The SCV constructing the building
         if b_type in ["Command Center", "Barracks", "Tank Factory", "Wraith Factory", "Bunker"]:
             self.production_queue = []
             self.production_timer = 0.0
@@ -223,7 +238,7 @@ class Unit:
         self.health = 50
         self.move_target = None   # (x, y)
         if u_type == "SCV":
-            self.state = "idle"   # Possible states: idle, to_mineral, mining, to_depot, building, repairing, moving, etc.
+            self.state = "idle"   # states: idle, to_mineral, mining, to_depot, building, repairing, moving, etc.
             self.mine_timer = 0
             self.target_mineral = None
             self.deposit_target = None
@@ -452,79 +467,19 @@ def apply_game_snapshot(game, snapshot):
     print("State snapshot applied.")
 
 # =======================
-#   STARTING SCREEN
-# =======================
-def starting_screen():
-    """Display instructions on screen before starting the game."""
-    screen.fill((0, 0, 0))
-    font_title = pygame.font.SysFont(None, 72)
-    font_instr = pygame.font.SysFont(None, 36)
-    title_text = font_title.render("RTS Multiplayer", True, (255, 255, 255))
-    instr_lines = [
-        "Press ENTER to start the game.",
-        "Follow terminal prompts for network mode:",
-        "  HOST: Wait for a connection.",
-        "  CLIENT: Enter the host IP address."
-    ]
-    y = SCREEN_HEIGHT // 3
-    screen.blit(title_text, (SCREEN_WIDTH//2 - title_text.get_width()//2, y))
-    y += 100
-    for line in instr_lines:
-        text = font_instr.render(line, True, (200, 200, 200))
-        screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, y))
-        y += 40
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == KEYDOWN and event.key == pygame.K_RETURN:
-                waiting = False
-            elif event.type == QUIT:
-                pygame.quit()
-                sys.exit()
-
-# =======================
-#   CONTROLS OVERLAY
-# =======================
-def draw_controls(surface):
-    font = pygame.font.SysFont(None, 32)
-    overlay = pygame.Surface((600, 300))
-    overlay.set_alpha(230)
-    overlay.fill((0, 0, 0))
-    controls = [
-        "Controls:",
-        "Left Click: Select / Place buildings",
-        "Right Click: Move command for SCVs and troops",
-        "P: Build mode. Then press:",
-        "   B - Barracks, F - Tank Factory, W - Wraith Factory, T - Turret, N - Bunker",
-        "S: Queue production order for selected building",
-        "R: Repair command (with SCV selected)",
-        "X: Upgrade weapon damage (cost 100 minerals)",
-        "A: Attack command (target location)",
-        "C: Hold to view this help overlay"
-    ]
-    for i, line in enumerate(controls):
-        text = font.render(line, True, (255,255,255))
-        overlay.blit(text, (20, 20 + i * 32))
-    surface.blit(overlay, (SCREEN_WIDTH//2 - 300, SCREEN_HEIGHT//2 - 150))
-
-# =======================
-#       MAIN SETUP
+#   MAIN SETUP (No Starting Screen)
 # =======================
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
 pygame.display.set_caption("RTS Multiplayer")
 clock = pygame.time.Clock()
 
-# Show starting screen instructions
-starting_screen()
-
-# Initialize networking (this will prompt in the terminal)
+# Automatically initialize networking without a starting screen.
 init_network()
 
 cam_offset = [0, 0]
 waiting_for_build_key = False
-build_mode = None   # Options: Barracks, Tank Factory, Wraith Factory, Turret, Bunker
+build_mode = None   # Options: "Barracks", "Tank Factory", "Wraith Factory", "Turret", "Bunker"
 builder_unit = None
 
 # Create game instance.
@@ -753,7 +708,7 @@ while running:
             if net_ev.get("action") == "state_snapshot":
                 if network_mode == "client":
                     apply_game_snapshot(game, net_ev.get("snapshot", {}))
-            # Additional event types could be handled here to update the local state.
+            # Additional events can be processed here.
     
     # Update game simulation.
     game.update(dt)
@@ -768,7 +723,7 @@ while running:
         pygame.draw.line(screen, (20,20,20),
                          (0 - cam_offset[0], y - cam_offset[1]),
                          (WORLD_WIDTH - cam_offset[0], y - cam_offset[1]))
-    # Draw minerals for both players.
+    # Draw minerals.
     for m in game.player1_minerals:
         if m.amount > 0:
             pygame.draw.circle(screen, (255,255,0),
@@ -796,7 +751,7 @@ while running:
             col = (100,100,100)
         rect = pygame.Rect(b.x - 15 - cam_offset[0], b.y - 15 - cam_offset[1], 30, 30)
         pygame.draw.rect(screen, col, rect)
-        # Draw health bar.
+        # Health bar.
         bar_w, bar_h = 30, 4
         ratio = b.health / b.max_health
         pygame.draw.rect(screen, (255,0,0), (rect.left, rect.top-6, bar_w, bar_h))
@@ -830,7 +785,7 @@ while running:
             rect_unit = pygame.Rect(pos[0]-10, pos[1]-5, 20, 10)
             pygame.draw.ellipse(screen, (218,165,32), rect_unit)
             pygame.draw.line(screen, (0,0,0), (pos[0]+5, pos[1]), (pos[0]+15, pos[1]), 3)
-        # Draw unit health bar.
+        # Unit health bar.
         bw, bh = 20, 3
         ratio = u.health / 50
         pygame.draw.rect(screen, (255,0,0), (pos[0]-10, pos[1]-15, bw, bh))
@@ -880,7 +835,7 @@ while running:
             selected_counts["W"] += 1
     troop_text = font.render(f"(Troops: {selected_counts['M']}M {selected_counts['S']}S {selected_counts['T']}T {selected_counts['W']}W)", True, (255,255,255))
     screen.blit(troop_text, (10, 50))
-    # Draw a mini-map.
+    # Draw mini-map.
     mini_w, mini_h = 100, 100
     minimap = pygame.Surface((mini_w, mini_h))
     minimap.fill((50,50,50))
@@ -898,11 +853,31 @@ while running:
     cam_rect = pygame.Rect(int(cam_offset[0]*scale_x), int(cam_offset[1]*scale_y), int(SCREEN_WIDTH*scale_x), int(SCREEN_HEIGHT*scale_y))
     pygame.draw.rect(minimap, (255,255,0), cam_rect, 1)
     screen.blit(minimap, (10, SCREEN_HEIGHT - mini_h - 10))
+    # Display help overlay if C is held.
     if pygame.key.get_pressed()[pygame.K_c]:
+        def draw_controls(surface):
+            font = pygame.font.SysFont(None, 32)
+            overlay = pygame.Surface((600, 300))
+            overlay.set_alpha(230)
+            overlay.fill((0, 0, 0))
+            controls = [
+                "Controls:",
+                "Left Click: Select / Place buildings",
+                "Right Click: Move command for SCVs and troops",
+                "P: Build mode. Then press:",
+                "   B - Barracks, F - Tank Factory, W - Wraith Factory, T - Turret, N - Bunker",
+                "S: Queue production order for selected building",
+                "R: Repair command (with SCV selected)",
+                "X: Upgrade weapon damage (cost 100 minerals)",
+                "A: Attack command (target location)",
+                "C: Hold to view this help overlay"
+            ]
+            for i, line in enumerate(controls):
+                text = font.render(line, True, (255,255,255))
+                overlay.blit(text, (20, 20 + i * 32))
+            surface.blit(overlay, (SCREEN_WIDTH//2 - 300, SCREEN_HEIGHT//2 - 150))
         draw_controls(screen)
     pygame.display.flip()
 
 pygame.quit()
 sys.exit()
-
-# 10.103.1.51
