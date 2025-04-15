@@ -41,7 +41,7 @@ COST_COMMAND_CENTER = 500
 # Mining settings
 MINING_CYCLE = 4          # Seconds per mining cycle
 MINING_YIELD = 5          # Minerals per cycle
-MINERAL_AMOUNT = 2000     
+MINERAL_AMOUNT = random.randint(1500, 2500)     
 
 # Production settings
 PRODUCTION_TIME = 8.0     # Seconds per unit spawn
@@ -292,11 +292,10 @@ class Game:
         self.buildings = []
         self.units = []
         self.projectiles = []
-        self.resources = {"player": 50, "enemy": 50}
+        self.resources = {"player": 1000, "enemy": 50}
         self.game_over = False
         self.winner = None
-        self.player_minerals = []
-        self.enemy_minerals = []
+        self.minerals = []
         self.resource_drops = []
         self.enemy_attack_timer = 0
         self.elapsed_time = 0
@@ -498,8 +497,6 @@ class Game:
                 # No target found: remain in attack_move to keep moving in the general direction.
                 unit.state = "attack_move"
 
-
-
     def apply_separation(self, dt):
         combat_units = [u for u in self.units if u.type in ["Marine", "Tank", "Wraith"]]
         for i in range(len(combat_units)):
@@ -548,8 +545,6 @@ class Game:
             self.resources["enemy"] -= COST_WRAITH_FACTORY
             print("Enemy AI: Building additional Wraith Factory")
 
-
-
     def get_random_build_location(self, cc, radius=100, min_sep=20):
         """
         Returns a random (x, y) position within ±radius of the given Command Center (cc)
@@ -567,7 +562,7 @@ class Game:
                     break
             # Check for proximity to all minerals (both player and enemy).
             if valid:
-                for m in self.player_minerals + self.enemy_minerals:
+                for m in self.minerals:
                     if math.hypot(candidate_x - m.x, candidate_y - m.y) < min_sep:
                         valid = False
                         break
@@ -658,9 +653,26 @@ class Game:
                         u.target_enemy = target
                         u.state = "attacking"
             # Increase the threshold for the next attack (adjust increment as desired)
-            self.enemy_attack_threshold += 5
+            self.enemy_attack_threshold += random.randint(3, 7)
 
-
+                # --- Enemy Expansion Logic ---
+        # If enemy resources are high, try to expand by building a new Command Center near a mineral patch.
+        if self.resources["enemy"] > 1000:
+            expansion_built = False
+            # Iterate through all minerals
+            for mineral in self.minerals:
+                # Only consider mineral patches that still have minerals (amount > 0)
+                if mineral.amount > 0:
+                    # Check if there is already an enemy Command Center within a 300-pixel radius of this mineral.
+                    if self.get_building_near("Command Center", "enemy", (mineral.x, mineral.y), radius=300) is None:
+                        # Build a new Command Center at this mineral's position
+                        new_cc = self.add_building("Command Center", mineral.x, mineral.y, "enemy", complete=False)
+                        self.resources["enemy"] -= COST_COMMAND_CENTER
+                        print("Enemy AI: Expanding by building a new Command Center near a mineral patch!")
+                        expansion_built = True
+                        # Break after building one expansion to avoid rapid multiple expansions.
+                        break
+            # (Optional) If expansion was built, you might want to reset an expansion timer or perform additional logic.
 
     def update(self, dt):
         self.elapsed_time += dt
@@ -715,21 +727,27 @@ class Game:
                         u.state = "idle"
                     continue
                 if u.state == "repairing":
-                    self.move_towards(u, u.target_building.x, u.target_building.y, dt)
-                    if math.hypot(u.x - u.target_building.x, u.y - u.target_building.y) < 5:
-                        u.target_building.health += 10 * dt
-                        if u.target_building.health >= u.target_building.max_health:
-                            u.target_building.health = u.target_building.max_health
-                            u.state = "idle"
-                            u.target_building = None
+                    # Check if target_building is valid before moving toward it
+                    if u.target_building is not None:
+                        self.move_towards(u, u.target_building.x, u.target_building.y, dt)
+                        if math.hypot(u.x - u.target_building.x, u.y - u.target_building.y) < 5:
+                            u.target_building.health += 10 * dt
+                            if u.target_building.health >= u.target_building.max_health:
+                                u.target_building.health = u.target_building.max_health
+                                u.state = "idle"
+                                u.target_building = None
+                    else:
+                        # If there's no target building, switch SCV back to idle state.
+                        u.state = "idle"
                     continue
                 if u.state == "building":
                     self.move_towards(u, u.target_building.x, u.target_building.y, dt)
                     continue
                 if u.state == "idle" and u.target_mineral is None:
-                    available = [m for m in self.player_minerals if m.amount > 0 and math.hypot(u.x - m.x, u.y - m.y) <= 800]
+                    available = [m for m in self.minerals if m.amount > 0 and len(m.mining_scvs) < 3 and math.hypot(u.x - m.x, u.y - m.y) <= 800]
                     if available:
                         u.target_mineral = random.choice(available)
+                        u.target_mineral.mining_scvs.append(u)  # Register this SCV as mining
                         u.state = "to_mineral"
                 if u.state == "moving" and u.move_target:
                     self.move_towards(u, u.move_target[0], u.move_target[1], dt)
@@ -748,6 +766,10 @@ class Game:
                             u.target_mineral.amount -= MINING_YIELD
                             u.cargo = MINING_YIELD
                         u.mine_timer = 0
+                        # Remove this SCV from the mineral's mining list if present.
+                        if u.target_mineral and u in u.target_mineral.mining_scvs:
+                            u.target_mineral.mining_scvs.remove(u)
+                        u.target_mineral = None
                         u.state = "to_depot"
                 elif u.state == "to_depot" and u.deposit_target:
                     # Calculate the center of the deposit building (Command Center) using its grid dimension.
@@ -806,11 +828,11 @@ class Game:
             # ---- Enemy SCV Behavior ----
             if u.type == "SCV" and u.owner == "enemy":
                 if u.state == "idle" and u.target_mineral is None:
-                    available = [m for m in self.player_minerals if m.amount > 0 and math.hypot(u.x - m.x, u.y - m.y) <= 800]
+                    available = [m for m in self.minerals if m.amount > 0 and len(m.mining_scvs) < 3 and math.hypot(u.x - m.x, u.y - m.y) <= 800]
                     if available:
                         u.target_mineral = random.choice(available)
+                        u.target_mineral.mining_scvs.append(u)  # Register this SCV as mining
                         u.state = "to_mineral"
-
                 if u.state == "moving" and u.move_target:
                     self.move_towards(u, u.move_target[0], u.move_target[1], dt)
                     if math.hypot(u.x - u.move_target[0], u.y - u.move_target[1]) < 5:
@@ -829,7 +851,12 @@ class Game:
                             u.target_mineral.amount -= MINING_YIELD
                             u.cargo = MINING_YIELD
                         u.mine_timer = 0
+                        # Remove this SCV from the mineral's mining list if present.
+                        if u.target_mineral and u in u.target_mineral.mining_scvs:
+                            u.target_mineral.mining_scvs.remove(u)
+                        u.target_mineral = None
                         u.state = "to_depot"
+
                 elif u.state == "to_depot" and u.deposit_target:
                     # Calculate the center of the deposit building (Command Center) using its grid dimension.
                     depot_width = u.deposit_target.grid_dim * TILE_SIZE
@@ -875,6 +902,22 @@ class Game:
             if b.type == b_type and b.owner == owner and b.complete:
                 return b
         return None
+
+    def get_building_near(self, b_type, owner, pos, radius):
+        """
+        Returns a building of type b_type owned by 'owner' that is within 'radius' pixels of pos.
+        If no such building exists, return None.
+        """
+        for b in self.buildings:
+            if b.type == b_type and b.owner == owner and b.complete:
+                # Calculate the center of the building using its grid dimensions.
+                b_width = b.grid_dim * TILE_SIZE
+                b_height = b.grid_dim * TILE_SIZE
+                b_center = (b.x + b_width / 2, b.y + b_height / 2)
+                if math.hypot(b_center[0] - pos[0], b_center[1] - pos[1]) <= radius:
+                    return b
+        return None
+
 
     # New method for turret target selection
     def find_priority_target_for_turret(self, turret):
@@ -934,19 +977,19 @@ enemy_cc = game.add_building("Command Center", 2800, 2800, "enemy", complete=Tru
 # Generate corner mineral fields arranged in a half–circle.
 # Top-left corner:
 tl_corner = (250, 250)
-game.player_minerals += generate_corner_minerals_half_circle(tl_corner, count=9, start_offset=100, arc_radius=150)
+game.minerals += generate_corner_minerals_half_circle(tl_corner, count=9, start_offset=100, arc_radius=150)
 
 # Top-right corner:
 tr_corner = (WORLD_WIDTH - 250, 250)
-game.enemy_minerals += generate_corner_minerals_half_circle(tr_corner, count=9, start_offset=100, arc_radius=150)
+game.minerals += generate_corner_minerals_half_circle(tr_corner, count=9, start_offset=100, arc_radius=150)
 
 # Bottom-left corner:
 bl_corner = (250, WORLD_HEIGHT - 250)
-game.player_minerals += generate_corner_minerals_half_circle(bl_corner, count=9, start_offset=100, arc_radius=150)
+game.minerals += generate_corner_minerals_half_circle(bl_corner, count=9, start_offset=100, arc_radius=150)
 
 # Bottom-right corner:
 br_corner = (WORLD_WIDTH - 250, WORLD_HEIGHT - 250)
-game.enemy_minerals += generate_corner_minerals_half_circle(br_corner, count=9, start_offset=100, arc_radius=150)
+game.minerals += generate_corner_minerals_half_circle(br_corner, count=9, start_offset=100, arc_radius=150)
 
 
 
@@ -954,13 +997,13 @@ game.enemy_minerals += generate_corner_minerals_half_circle(br_corner, count=9, 
 # Add a central mineral field of 15 minerals arranged in a circle.
 center = (WORLD_WIDTH // 2, WORLD_HEIGHT // 2)
 central_minerals = generate_center_minerals(center, count=15, radius=150)
-game.player_minerals += central_minerals  # or add to both sides if desired
+game.minerals += central_minerals  # or add to both sides if desired
 
-for i in range(4):
+for i in range(10):
     scv = game.add_unit("SCV", player_cc.x + 20 + i * 15, player_cc.y + 20, "player")
     scv.state = "idle"
     scv.deposit_target = player_cc
-for i in range(4):
+for i in range(10):
     escv = game.add_unit("SCV", enemy_cc.x + 20 + i * 15, enemy_cc.y + 20, "enemy")
     escv.state = "idle"
     escv.deposit_target = enemy_cc
@@ -1018,7 +1061,7 @@ while running:
                     # Define the minimum distance: 5 tiles.
                     min_distance = 5 * TILE_SIZE
                     valid_location = True
-                    for m in game.player_minerals + game.enemy_minerals:
+                    for m in game.minerals:
                         if math.hypot(new_x - m.x, new_y - m.y) < min_distance:
                             valid_location = False
                             break
@@ -1183,7 +1226,9 @@ while running:
                 if selection_rect.width < 10 and selection_rect.height < 10:
                     found = False
                     for b in game.buildings:
-                        rect = pygame.Rect(b.x - 15, b.y - 15, 30, 30)
+                        width = b.grid_dim * TILE_SIZE
+                        height = b.grid_dim * TILE_SIZE
+                        rect = pygame.Rect(b.x, b.y, width, height)
                         if rect.collidepoint(selection_rect.center):
                             selected_units = [b]
                             found = True
@@ -1216,14 +1261,43 @@ while running:
         print(f"Game Over! {game.winner} wins!")
         running = False
     screen.fill((0, 0, 0))
+    if build_mode:
+        for x in range(0, WORLD_WIDTH, TILE_SIZE):
+            for y in range(0, WORLD_HEIGHT, TILE_SIZE):
+                screen_x = x - cam_offset[0]
+                screen_y = y - cam_offset[1]
+                pygame.draw.rect(screen, (0, 100, 0), (screen_x, screen_y, TILE_SIZE, TILE_SIZE), 1)
+    if build_mode and builder_unit:
+        pygame.draw.circle(screen, (0, 0, 255), (int(builder_unit.x - cam_offset[0]), int(builder_unit.y - cam_offset[1])), 12, 2)
+    if build_mode is not None and builder_unit:
+        mx2, my2 = pygame.mouse.get_pos()
+        preview_rect = pygame.Rect(mx2 - 15, my2 - 15, 30, 30)
+        pygame.draw.rect(screen, (0,255,0), preview_rect, 2)
+        # ... (code to render letter)
+    if build_mode and builder_unit:
+        mx2, my2 = pygame.mouse.get_pos()
+        # Snap the mouse position to the grid.
+        grid_x = (mx2 + cam_offset[0]) // TILE_SIZE * TILE_SIZE
+        grid_y = (my2 + cam_offset[1]) // TILE_SIZE * TILE_SIZE
+        # Determine building size (grid dimension * TILE_SIZE); default is 1 if not specified.
+        size = BUILDING_GRID.get(build_mode, 1) * TILE_SIZE
+        preview_rect = pygame.Rect(grid_x - cam_offset[0], grid_y - cam_offset[1], size, size)
+        pygame.draw.rect(screen, (0, 255, 0), preview_rect, 2)
+        
+        # Optionally, display a letter representing the building type.
+        font_mid = pygame.font.SysFont(None, 32)
+        letter = {"Barracks": "B", "Tank Factory": "F", "Wraith Factory": "W", "Turret": "T", "Bunker": "N"}.get(build_mode, "")
+        if letter:
+            txt = font_mid.render(letter, True, (0, 255, 0))
+            screen.blit(txt, (mx2 - 10, my2 - 12))
     for x in range(0, WORLD_WIDTH, 100):
         pygame.draw.line(screen, (20,20,20), (x - cam_offset[0], 0 - cam_offset[1]), (x - cam_offset[0], WORLD_HEIGHT - cam_offset[1]))
     for y in range(0, WORLD_HEIGHT, 100):
         pygame.draw.line(screen, (20,20,20), (0 - cam_offset[0], y - cam_offset[1]), (WORLD_WIDTH - cam_offset[0], y - cam_offset[1]))
-    for m in game.player_minerals:
+    for m in game.minerals:
         if m.amount > 0:
             pygame.draw.circle(screen, (255,255,0), (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
-    for m in game.enemy_minerals:
+    for m in game.minerals:
         if m.amount > 0:
             pygame.draw.circle(screen, (200,200,0), (int(m.x - cam_offset[0]), int(m.y - cam_offset[1])), 8)
     for drop in game.resource_drops:
@@ -1251,7 +1325,7 @@ while running:
         pygame.draw.rect(screen, col, rect)
 
             # --- New: For Command Centers, display production queue above its center ---
-        if b.type == "Command Center" and b.production_queue is not None:
+        if b.production_queue is not None:
             font_small = pygame.font.SysFont(None, 20)
             prod_text = font_small.render(f"{b.production_timer:.1f}s / {len(b.production_queue)}", True, (255,255,255))
             # Calculate position: center of Command Center, then offset upward.
@@ -1339,7 +1413,7 @@ while running:
             # Minimum allowed distance is 5 tiles (5 * TILE_SIZE).
             min_distance = 5 * TILE_SIZE
             valid_location = True
-            for m in game.player_minerals + game.enemy_minerals:
+            for m in game.minerals:
                 if math.hypot(new_x - m.x, new_y - m.y) < min_distance:
                     valid_location = False
                     break
@@ -1377,6 +1451,30 @@ while running:
                 selected_counts["W"] += 1
     troop_text = font.render(f"(Selected Troops: {selected_counts['M']}M {selected_counts['S']}S {selected_counts['T']}T {selected_counts['W']}W)", True, (255,255,255))
     screen.blit(troop_text, (10, 50))
+    """# --- Begin: AI Debug Info (Display on Right Side) ---
+    font_debug = pygame.font.SysFont(None, 22)
+
+    ai_scv = game.count_units("enemy", "SCV")
+    ai_marine = game.count_units("enemy", "Marine")
+    ai_tank = game.count_units("enemy", "Tank")
+    ai_wraith = game.count_units("enemy", "Wraith")
+    ai_buildings = len([b for b in game.buildings if b.owner == "enemy"])
+    ai_minerals = game.resources["enemy"]
+
+    debug_lines = [
+        f"AI SCVs: {ai_scv}",
+        f"AI Marines: {ai_marine}",
+        f"AI Tanks: {ai_tank}",
+        f"AI Wraiths: {ai_wraith}",
+        f"AI Buildings: {ai_buildings}",
+        f"AI Minerals: {ai_minerals}",
+    ]
+
+for i, line in enumerate(debug_lines):
+    txt = font_debug.render(line, True, (200, 200, 255))
+    screen.blit(txt, (SCREEN_WIDTH - 200, 10 + i * 20))
+# --- End: AI Debug Info ---"""
+
     mini_w, mini_h = 100, 100
     minimap = pygame.Surface((mini_w, mini_h))
     minimap.fill((50,50,50))
